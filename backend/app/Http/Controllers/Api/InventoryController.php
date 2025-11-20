@@ -1,0 +1,274 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\Inventory;
+use App\Models\InventoryRawmat;
+use Illuminate\Support\Facades\DB;
+
+class InventoryController extends Controller
+{
+    public function index()
+    {
+        $inventories = Inventory::all()->map(function($item) {
+            $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+            return $item;
+        });
+
+        return response()->json($inventories);
+    }
+
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'item' => 'required|string',
+            'unit' => 'required|string',
+            'pcs_per_unit' => 'required|integer|min:1',
+            'quantity' => 'required|integer|min:0',
+            'quantity_pcs' => 'nullable|integer|min:0',
+            'unit_cost' => 'nullable|numeric|min:0',
+            'materials_needed' => 'nullable|array',
+            'materials_needed.*' => 'string',
+        ]);
+
+        $validated['pcs_per_unit'] = $validated['pcs_per_unit'] ?? 1;
+        $validated['materials_needed'] = $validated['materials_needed'] ?? [];
+
+        $item = Inventory::create($validated);
+
+        return response()->json([
+            'message' => 'Item added successfully',
+            'data' => $item
+        ], 201);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate(['quantity' => 'required|integer|min:0']);
+        $item = Inventory::findOrFail($id);
+        $item->quantity = $validated['quantity'];
+        $item->save();
+
+        return response()->json(['message' => 'Inventory updated successfully']);
+    }
+
+    /**
+     * Deduct items from both finished goods and raw materials
+     */
+/**
+ * Deduct items from both finished goods and raw materials
+ */
+public function deduct(Request $request)
+{
+    $type = $request->input('type');  // Finished Goods or Raw Materials
+    $itemName = $request->input('item');
+    $quantity = (int) $request->input('quantity'); // user input
+    $unit = $request->input('unit', 'unit');      // default to 'unit'
+
+    if (!$itemName || $quantity <= 0) {
+        return response()->json(['error' => 'Missing or invalid required fields.'], 400);
+    }
+
+    // Determine which table
+    if ($type === 'Finished Goods') {
+        $inventory = Inventory::where('item', $itemName)->first();
+    } elseif ($type === 'Raw Materials') {
+        $inventory = InventoryRawmat::where('item', $itemName)->first();
+    } else {
+        return response()->json(['error' => 'Invalid type specified.'], 400);
+    }
+
+    if (!$inventory) {
+        return response()->json(['error' => "{$type} item not found."], 404);
+    }
+
+    $pcsPerUnit = $inventory->pcs_per_unit ?? 1;
+
+    // Calculate total pieces to deduct
+    if ($unit === 'pcs') {
+        $totalPiecesToDeduct = $quantity; // Already in pieces
+    } else {
+        $totalPiecesToDeduct = $quantity * $pcsPerUnit; // Convert units to pieces
+    }
+
+    if ($inventory->quantity_pcs < $totalPiecesToDeduct) {
+        return response()->json(['error' => 'Insufficient stock.'], 400);
+    }
+
+    // Deduct pieces
+    $inventory->quantity_pcs -= $totalPiecesToDeduct;
+    $inventory->quantity = intdiv($inventory->quantity_pcs, $pcsPerUnit);
+
+    $inventory->save();
+
+    return response()->json([
+        'message' => "✅ Successfully deducted {$quantity} {$unit} from {$itemName} ({$totalPiecesToDeduct} pcs).",
+        'data' => $inventory
+    ]);
+}
+
+
+public function receiveItem(Request $request)
+{
+    $validated = $request->validate([
+        'item' => 'required|string',
+        'unit' => 'required|string',
+        'pcs_per_unit' => 'nullable|integer|min:1',
+        'quantity' => 'required|integer|min:1',
+        'quantity_pcs' => 'nullable|integer|min:0',
+        'unit_cost' => 'nullable|numeric|min:0', // add this
+    ]);
+
+    $validated['pcs_per_unit'] = $validated['pcs_per_unit'] ?? 1;
+
+    $item = Inventory::firstOrCreate(
+        ['item' => $validated['item']],
+        ['unit' => $validated['unit'], 'quantity' => 0, 'quantity_pcs' => 0, 'unit_cost' => $validated['unit_cost'] ?? 0]
+    );
+
+    $item->pcs_per_unit = $validated['pcs_per_unit'];
+    $item->quantity += $validated['quantity'];
+    $item->quantity_pcs += $validated['quantity_pcs'] ?? 0;
+    $item->unit_cost = $validated['unit_cost'] ?? $item->unit_cost; // update if provided
+    $item->save();
+
+    return response()->json([
+        'message' => 'Inventory updated successfully',
+        'data' => $item
+    ]);
+}
+
+    public function addQuantity(Request $request, $id)
+    {
+        $request->validate(['quantity' => 'required|integer|min:1']);
+
+        $inventory = Inventory::findOrFail($id);
+        $inventory->quantity += $request->quantity;
+        $inventory->save();
+
+        return response()->json([
+            'message' => 'Quantity updated successfully',
+            'data' => $inventory
+        ]);
+    }
+
+    public function updateAlert(Request $request, $id)
+    {
+        $request->validate(['low_stock_alert' => 'required|integer|min:1']);
+        $item = Inventory::findOrFail($id);
+        $item->low_stock_alert = $request->low_stock_alert;
+        $item->save();
+
+        return response()->json(['message' => 'Alert quantity updated successfully']);
+    }
+
+public function inventoryByYear(Request $request)
+{
+    $year = $request->query('year', now()->year);
+
+    $data = Inventory::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(quantity_pcs) as total_quantity')
+        ->whereRaw('EXTRACT(YEAR FROM created_at) = ?', [$year])
+        ->groupBy('month')
+        ->orderBy('month')
+        ->get();
+
+    return response()->json($data);
+}
+public function updatePrice(Request $request, $id)
+{
+    // Validate that unit_cost is present and numeric
+    $request->validate([
+        'unit_cost' => 'required|numeric|min:0',
+    ]);
+
+    $item = Inventory::find($id);
+
+    if (!$item) {
+        return response()->json(['message' => 'Item not found'], 404);
+    }
+
+    $item->unit_cost = $request->unit_cost;
+    $item->save();
+
+    return response()->json([
+        'message' => 'Price updated successfully',
+        'data' => $item
+    ]);
+}
+public function updateMaterials(Request $request, $id)
+{
+    $inventory = Inventory::findOrFail($id);
+
+    // Get materials array from request
+    $materials = $request->input('materials_needed', []);
+
+    // Save as JSON to the correct column
+    $inventory->materials_needed = json_encode($materials);
+    $inventory->save();
+
+    return response()->json([
+        'message' => 'Materials updated successfully',
+        'data' => $inventory
+    ]);
+}
+public function finishedGoods()
+{
+    // Return all items in inventories as finished goods
+    $finishedGoods = Inventory::all()
+        ->map(function($item) {
+            $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+            return $item;
+        });
+
+    return response()->json($finishedGoods);
+}
+
+public function getFinishedGood($itemName)
+{
+    // Fetch by item name instead of ID
+    $item = Inventory::where('item', $itemName)->first();
+
+    if (!$item) {
+        return response()->json(['message' => 'Product not found'], 404);
+    }
+
+    $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+
+    return response()->json($item);
+}
+
+    public function destroy($id)
+    {
+        $inventory = Inventory::find($id);
+
+        if (!$inventory) {
+            return response()->json(['message' => 'Item not found'], 404);
+        }
+
+        try {
+            $inventory->delete(); // Soft delete
+            return response()->json(['message' => 'Item deleted successfully (soft deleted)']);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Cannot delete item. It may be referenced in other records.'
+            ], 400);
+        }
+    }
+
+        public function restore($id)
+    {
+        $inventory = Inventory::withTrashed()->find($id);
+
+        if (!$inventory) {
+            return response()->json(['message' => 'Item not found'], 404);
+        }
+
+        $inventory->restore();
+
+        return response()->json(['message' => 'Item restored successfully']);
+    }
+
+}
