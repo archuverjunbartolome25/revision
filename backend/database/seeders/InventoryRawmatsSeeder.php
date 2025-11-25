@@ -13,9 +13,11 @@ class InventoryRawmatsSeeder extends Seeder
      */
     public function run(): void
     {
+        DB::table('inventory_rawmats')->truncate();
         $now = Carbon::now();
 
         DB::table('inventory_rawmats')->insert([
+            // Plastic Bottles
             [
                 'id' => 1,
                 'item' => 'Plastic Bottle (350ml)',
@@ -23,10 +25,11 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 200000,
                 'conversion' => 1,
                 'quantity_pieces' => 200000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 50000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 2.10,
+                'unit_cost' => 2.10,
+                'supplier_id' => 1, // Mc Bride
             ],
             [
                 'id' => 2,
@@ -35,22 +38,24 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 300000,
                 'conversion' => 1,
                 'quantity_pieces' => 300000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 50000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 2.25,
+                'unit_cost' => 2.25,
+                'supplier_id' => 1, // Mc Bride
             ],
             [
                 'id' => 3,
                 'item' => 'Plastic Bottle (500ml)',
                 'unit' => 'pieces',
                 'quantity' => 250000,
-                'conversion' => 2,
+                'conversion' => 1,
                 'quantity_pieces' => 250000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 50000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 2.35,
+                'unit_cost' => 2.35,
+                'supplier_id' => 2, // Filpet (same item, different supplier)
             ],
             [
                 'id' => 4,
@@ -59,10 +64,11 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 150000,
                 'conversion' => 1,
                 'quantity_pieces' => 150000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 30000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 4.05,
+                'unit_cost' => 4.05,
+                'supplier_id' => 1, // Mc Bride
             ],
             [
                 'id' => 5,
@@ -71,11 +77,13 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 100000,
                 'conversion' => 1,
                 'quantity_pieces' => 100000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 20000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 23.00,
+                'unit_cost' => 23.00,
+                'supplier_id' => 1, // Mc Bride
             ],
+            // Caps
             [
                 'id' => 6,
                 'item' => 'Blue Plastic Cap',
@@ -83,22 +91,24 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 300000,
                 'conversion' => 1,
                 'quantity_pieces' => 300000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 100000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 0.50,
+                'unit_cost' => 0.50,
+                'supplier_id' => 1, // Mc Bride
             ],
             [
                 'id' => 7,
                 'item' => 'Blue Plastic Cap',
                 'unit' => 'pieces',
                 'quantity' => 400000,
-                'conversion' => 2,
+                'conversion' => 1,
                 'quantity_pieces' => 400000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 100000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 0.49,
+                'unit_cost' => 0.49,
+                'supplier_id' => 2, // Filpet (same item, different supplier)
             ],
             [
                 'id' => 8,
@@ -107,46 +117,52 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 150000,
                 'conversion' => 1,
                 'quantity_pieces' => 150000,
-                'low_stock_alert' => 150000,
+                'low_stock_alert' => 30000,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 3.00,
+                'unit_cost' => 3.00,
+                'supplier_id' => 1, // Mc Bride
             ],
+            // Labels
             [
                 'id' => 9,
                 'item' => 'Label',
                 'unit' => 'rolls',
-                'quantity' => 20,
-                'conversion' => 10,
-                'quantity_pieces' => 20000,
-                'low_stock_alert' => 400000,
+                'quantity' => 50,
+                'conversion' => 10000, // 10,000 labels per roll
+                'quantity_pieces' => 500000,
+                'low_stock_alert' => 20,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 7960.00,
+                'unit_cost' => 7960.00,
+                'supplier_id' => 3, // Royalseal
             ],
             [
                 'id' => 10,
                 'item' => 'Label',
                 'unit' => 'rolls',
-                'quantity' => 10,
-                'conversion' => 10,
-                'quantity_pieces' => 20000,
-                'low_stock_alert' => 200000,
+                'quantity' => 40,
+                'conversion' => 10000,
+                'quantity_pieces' => 400000,
+                'low_stock_alert' => 20,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 5960.00,
+                'unit_cost' => 5960.00,
+                'supplier_id' => 4, // Shrinkpack (same item, different supplier)
             ],
+            // Films
             [
                 'id' => 11,
                 'item' => 'Stretchfilm',
                 'unit' => 'pieces',
-                'quantity' => 100,
+                'quantity' => 150,
                 'conversion' => 1,
-                'quantity_pieces' => 100,
+                'quantity_pieces' => 150,
                 'low_stock_alert' => 50,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 320.00,
+                'unit_cost' => 320.00,
+                'supplier_id' => 5, // Synergy
             ],
             [
                 'id' => 12,
@@ -155,10 +171,11 @@ class InventoryRawmatsSeeder extends Seeder
                 'quantity' => 120,
                 'conversion' => 1,
                 'quantity_pieces' => 120,
-                'low_stock_alert' => 50,
+                'low_stock_alert' => 30,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'price' => 2337.00,
+                'unit_cost' => 2337.00,
+                'supplier_id' => 6, // Polyflex
             ],
         ]);
     }

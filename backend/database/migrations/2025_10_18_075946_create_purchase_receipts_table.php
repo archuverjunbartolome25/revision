@@ -23,6 +23,9 @@ public function up()
         $table->timestamp('received_date')->useCurrent();
         $table->timestamps();
 
+        $table->string('image_path')->nullable();
+        $table->string('image_mime')->nullable();
+    
         $table->foreign('purchase_order_id')->references('id')->on('purchase_orders')->onDelete('cascade');
         $table->foreign('purchase_order_item_id')->references('id')->on('purchase_order_items')->onDelete('cascade');
     });

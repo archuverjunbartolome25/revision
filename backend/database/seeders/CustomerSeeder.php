@@ -9,6 +9,8 @@ class CustomerSeeder extends Seeder
 {
     public function run()
     {
+        DB::table('customers')->truncate();
+
         DB::table('customers')->insert([
             [
                 'id' => 1,

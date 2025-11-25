@@ -382,7 +382,13 @@ public function purchaseOrderReportPDF(Request $request)
         $items = DB::table('purchase_order_items')
             ->where('purchase_order_id', $po->id)
             ->select('item_name', 'quantity', 'received_quantity')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                $item->quantity = number_format($item->quantity);
+                $item->received_quantity = number_format($item->received_quantity);
+                return $item;
+            });
+    
         $po->items = $items;
         return $po;
     });

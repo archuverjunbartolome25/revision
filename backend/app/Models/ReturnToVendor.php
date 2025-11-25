@@ -18,6 +18,10 @@ class ReturnToVendor extends Model
         'date_ordered',
         'date_returned',
         'status',
+        'qty_350ml',
+        'qty_500ml',
+        'qty_1l',
+        'qty_6l',
     ];
 
     // Relationship to Customer
@@ -27,9 +31,9 @@ class ReturnToVendor extends Model
     }
 
     // Relationship to items (dynamic)
-public function items()
-{
-    return $this->hasMany(ReturnToVendorItem::class, 'return_id'); // match your DB column
-}
+    public function items()
+    {
+        return $this->hasMany(ReturnToVendorItem::class, 'return_id'); // match your DB column
+    }
 
 }

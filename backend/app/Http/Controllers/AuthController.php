@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -14,12 +15,12 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'companyID' => 'required|string|unique:users',
+            'employeeID' => 'required|string|unique:users',
             'password'  => 'required|string|min:6',
         ]);
 
         $user = User::create([
-            'companyID' => $request->companyID,
+            'employeeID' => $request->employeeID,
             'password'  => Hash::make($request->password),
             'status'    => 'Active', // default to Active
         ]);
@@ -30,33 +31,47 @@ class AuthController extends Controller
     /**
      * Login user.
      */
+
     public function login(Request $request)
     {
         $request->validate([
             'employeeID' => 'required|string',
             'password'   => 'required|string',
         ]);
-
+    
+        Log::info('Login attempt', ['employeeID' => $request->employeeID]);
+    
         $user = User::where('employeeID', $request->employeeID)->first();
-
+    
         if (!$user) {
+            Log::warning('Login failed: user not found', ['employeeID' => $request->employeeID]);
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
-
+    
         // Check if user is inactive first
         if ($user->status !== 'Active') {
+            Log::warning('Login failed: account inactive', [
+                'employeeID' => $request->employeeID,
+                'status' => $user->status
+            ]);
             return response()->json([
                 'message' => 'Account is inactive. Please contact admin.'
             ], 403);
         }
-
+    
         // Then check password
         if (!Hash::check($request->password, $user->password)) {
+            Log::warning('Login failed: wrong password', ['employeeID' => $request->employeeID]);
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
-
+    
         $token = $user->createToken('auth_token')->plainTextToken;
-
+    
+        Log::info('Login successful', [
+            'employeeID' => $request->employeeID,
+            'role' => $user->role
+        ]);
+    
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'Bearer',
@@ -65,6 +80,7 @@ class AuthController extends Controller
             'status'       => $user->status,
         ]);
     }
+    
 
     /**
      * Logout user.

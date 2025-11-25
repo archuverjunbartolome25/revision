@@ -11,11 +11,4 @@ class Supplier extends Model
 {
     return $this->hasMany(SupplierOffer::class);
 }
-
-public function rawMaterials()
-{
-    return $this->belongsToMany(InventoryRawmat::class, 'supplier_offers', 'supplier_id', 'rawmat_id')
-                ->withPivot('price', 'lead_time_days', 'notes');
-}
-
 }

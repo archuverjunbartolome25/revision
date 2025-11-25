@@ -10,12 +10,12 @@
     {
         public function run()
         {
-            // Clear old data (optional)
-            DB::table('users')->where('employeeID', 'E072501')->delete();
+            DB::table('users')->truncate();
 
             DB::table('users')->insert([
+                'id' => 1,  
                 'employeeID' => 'E072501',
-                'password' => Hash::make('09192519300'),
+                'password' => Hash::make('password123'),
                 'created_at' => now(),
                 'updated_at' => now(),
                 'role' => 'Warehouse Supervisor',

@@ -242,5 +242,5 @@ Route::put('/inventories/{id}/update-materials', [InventoryController::class, 'u
 Route::get('inventories/finished-goods/{item}', [InventoryController::class, 'getFinishedGood']);
 Route::delete('/inventories/{id}', [InventoryController::class, 'destroy']);
 Route::post('inventories/restore/{id}', [InventoryController::class, 'restore']);
-Route::post('/upload', [PurchaseOrderController::class, 'upload']);
+// Route::post('/upload', [PurchaseOrderController::class, 'upload']);
 

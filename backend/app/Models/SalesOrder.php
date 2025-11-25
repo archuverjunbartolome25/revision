@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Customer;
+use App\Models\Employee;
 
 class SalesOrder extends Model
 {
@@ -20,23 +21,30 @@ class SalesOrder extends Model
         'date',
         'delivery_date',
         'order_type',
+        // TODO REMOVE THIS
         'qty_350ml',
         'qty_500ml',
         'qty_1L',
         'qty_6L',
         'status',
+        'date_delivered',
     ];
 
     protected $casts = [
         'products'   => 'array',
         'quantities' => 'array',
+        'date'       => 'date',
+        'delivery_date' => 'date',
+        'date_delivered' => 'date',
     ];
 
-    /**
-     * Get the customer that owns the sales order.
-     */
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 }
