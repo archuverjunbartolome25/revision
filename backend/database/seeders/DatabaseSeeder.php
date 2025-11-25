@@ -14,23 +14,25 @@ class DatabaseSeeder extends Seeder
      */
 public function run(): void
 {
+
+    // PersonalAccessTokensSeeder::class,
+
     $this->call([
-        DefaultUserSeeder::class,
-        InventorySeeder::class,
-        InventoryRawmatsSeeder::class,
-        CustomerSeeder::class,
-        SuppliersTableSeeder::class,
-        SupplierOffersTableSeeder::class,
-        SalesOrdersTableSeeder::class,
-        ReturnToVendorTableSeeder::class,
+        // DefaultUserSeeder::class,
+        // InventorySeeder::class,
+        // InventoryRawmatsSeeder::class,
+        // CustomerSeeder::class,
+        // SuppliersTableSeeder::class,
+        // SupplierOffersTableSeeder::class,
+        // SalesOrdersTableSeeder::class,
+        // ReturnToVendorTableSeeder::class,
+        // ReturnToVendorItemTableSeeder::class,
+        // PurchaseOrdersSeeder::class,
+        // PurchaseOrderItemsSeeder::class,
         PurchaseReceiptsSeeder::class,
-        PurchaseOrdersSeeder::class,
-        PurchaseOrderItemsSeeder::class,
-        ProductionOutputsSeeder::class,
-        PersonalAccessTokensSeeder::class,
-        InventoryActivityLogsSeeder::class,
-        DisposalsSeeder::class,
+        // ProductionOutputsSeeder::class,
+        // InventoryActivityLogsSeeder::class,
+        // DisposalsSeeder::class,
     ]);
 }
-
 }

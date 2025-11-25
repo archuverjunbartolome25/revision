@@ -7,12 +7,14 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseReceiptsSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
+        DB::table('purchase_receipts')->truncate();
+
         DB::table('purchase_receipts')->insert([
+            // -------------------------
+            // PO #1 — Mc Bride Corporation
+            // -------------------------
             [
                 'id' => 1,
                 'purchase_order_id' => 1,
@@ -24,7 +26,12 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-03 00:51:57',
                 'updated_at' => '2025-11-03 00:51:57',
                 'image_path' => null,
+                'image_mime' => null,
             ],
+
+            // -------------------------
+            // PO #2 — Filpet, Inc.
+            // -------------------------
             [
                 'id' => 2,
                 'purchase_order_id' => 2,
@@ -36,6 +43,7 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-03 19:39:55',
                 'updated_at' => '2025-11-03 19:39:55',
                 'image_path' => null,
+                'image_mime' => null,
             ],
             [
                 'id' => 3,
@@ -48,33 +56,14 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-03 19:39:56',
                 'updated_at' => '2025-11-03 19:39:56',
                 'image_path' => null,
+                'image_mime' => null,
             ],
+
+            // -------------------------
+            // PO #3 — Royalseal
+            // -------------------------
             [
                 'id' => 4,
-                'purchase_order_id' => 2,
-                'purchase_order_item_id' => 2,
-                'po_number' => 'PO-1762169848814',
-                'item_name' => 'Plastic Bottle (350ml)',
-                'quantity_received' => 50000,
-                'received_date' => '2025-11-03 19:41:17',
-                'created_at' => '2025-11-03 19:41:17',
-                'updated_at' => '2025-11-03 19:41:17',
-                'image_path' => null,
-            ],
-            [
-                'id' => 5,
-                'purchase_order_id' => 2,
-                'purchase_order_item_id' => 3,
-                'po_number' => 'PO-1762169848814',
-                'item_name' => 'Plastic Bottle (500ml)',
-                'quantity_received' => 25000,
-                'received_date' => '2025-11-03 19:41:18',
-                'created_at' => '2025-11-03 19:41:18',
-                'updated_at' => '2025-11-03 19:41:18',
-                'image_path' => null,
-            ],
-            [
-                'id' => 6,
                 'purchase_order_id' => 3,
                 'purchase_order_item_id' => 4,
                 'po_number' => 'PO-1762180484692',
@@ -84,9 +73,10 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-03 22:36:54',
                 'updated_at' => '2025-11-03 22:36:54',
                 'image_path' => null,
+                'image_mime' => null,
             ],
             [
-                'id' => 7,
+                'id' => 5,
                 'purchase_order_id' => 3,
                 'purchase_order_item_id' => 4,
                 'po_number' => 'PO-1762180484692',
@@ -96,9 +86,14 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-03 22:37:38',
                 'updated_at' => '2025-11-03 22:37:38',
                 'image_path' => null,
+                'image_mime' => null,
             ],
+
+            // -------------------------
+            // PO #4 — Mc Bride Corporation
+            // -------------------------
             [
-                'id' => 8,
+                'id' => 6,
                 'purchase_order_id' => 4,
                 'purchase_order_item_id' => 5,
                 'po_number' => 'PO-1762242680745',
@@ -108,9 +103,10 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-04 15:52:05',
                 'updated_at' => '2025-11-04 15:52:05',
                 'image_path' => null,
+                'image_mime' => null,
             ],
             [
-                'id' => 9,
+                'id' => 7,
                 'purchase_order_id' => 4,
                 'purchase_order_item_id' => 5,
                 'po_number' => 'PO-1762242680745',
@@ -120,9 +116,14 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-04 15:53:08',
                 'updated_at' => '2025-11-04 15:53:08',
                 'image_path' => null,
+                'image_mime' => null,
             ],
+
+            // -------------------------
+            // PO #5 — Synergy
+            // -------------------------
             [
-                'id' => 10,
+                'id' => 8,
                 'purchase_order_id' => 5,
                 'purchase_order_item_id' => 6,
                 'po_number' => 'PO-1762270221965',
@@ -132,8 +133,8 @@ class PurchaseReceiptsSeeder extends Seeder
                 'created_at' => '2025-11-04 23:30:47',
                 'updated_at' => '2025-11-04 23:30:47',
                 'image_path' => null,
+                'image_mime' => null,
             ],
-            // Add remaining entries (11-19) similarly...
         ]);
     }
 }

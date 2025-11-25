@@ -11,16 +11,21 @@ class ProductionOutput extends Model
 
     protected $table = 'production_outputs';
 
-protected $fillable = [
-    'employee_id',
-    'product_name',
-    'quantity_pcs',        // total pieces produced
-    'quantity',            // total units produced
-    'materials_needed',    // JSON { material_name: qty_per_unit * units }
-    'selected_suppliers',  // JSON { material_name: supplier_id }
-    'batch_number',
-    'production_date',
-];
+    protected $fillable = [
+        'employee_id',
+        'product_name',
+        'quantity',            
+        'qty_350ml',
+        'qty_500ml',
+        'qty_1l',
+        'qty_6l',
+        'quantity_pcs',       
+        'materials_needed',    
+        'selected_suppliers', 
+        'batch_number',
+        'production_date',
+    ];
+
     protected $casts = [
         'materials_needed' => 'array',
         'selected_suppliers' => 'array',

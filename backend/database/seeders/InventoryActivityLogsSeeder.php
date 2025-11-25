@@ -9,6 +9,8 @@ class InventoryActivityLogsSeeder extends Seeder
 {
     public function run()
     {
+        DB::table('inventory_activity_logs')->truncate();
+
         DB::table('inventory_activity_logs')->insert([
             [
                 'id' => 122,

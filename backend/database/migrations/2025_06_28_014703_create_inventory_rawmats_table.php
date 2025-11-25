@@ -9,11 +9,17 @@ class CreateInventoryRawmatsTable extends Migration
     public function up()
     {
         Schema::create('inventory_rawmats', function (Blueprint $table) {
-            $table->id(); // id column
-            $table->string('item'); // item name
-            $table->string('unit'); // unit like pcs, ml, etc
-            $table->integer('quantity'); // quantity
-            $table->timestamps(); // created_at, updated_at
+            $table->id();
+            $table->string('item');
+            $table->string('unit');
+            $table->integer('quantity')->default(0);
+            $table->integer('conversion')->default(1);
+            $table->integer('quantity_pieces')->default(0);
+            $table->integer('low_stock_alert')->default(0);
+            $table->unsignedBigInteger('supplier_id');
+            $table->decimal('unit_cost', 10, 2)->default(0);
+            $table->timestamps();
+
         });
     }
 

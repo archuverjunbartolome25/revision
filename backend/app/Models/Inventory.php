@@ -13,7 +13,7 @@ class Inventory extends Model
     protected $table = 'inventories';
 
     // ✅ Add 'low_stock_alert' here
-    protected $fillable = ['item', 'unit', 'pcs_per_unit', 'quantity', 'quantity_pcs', 'low_stock_alert'];
+    protected $fillable = ['item', 'unit', 'unit_cost', 'pcs_per_unit', 'quantity', 'quantity_pcs', 'low_stock_alert', 'materials_needed'];
     
     protected $casts = [
     'materials_needed' => 'array',

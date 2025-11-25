@@ -14,17 +14,18 @@ return new class extends Migration
             $table->string('location')->nullable();
             $table->date('date_ordered')->nullable();
             $table->date('date_returned')->nullable();
-
-            // Quantities
+        
             $table->integer('qty_350ml')->default(0);
             $table->integer('qty_500ml')->default(0);
             $table->integer('qty_1l')->default(0);
             $table->integer('qty_6l')->default(0);
-
+        
+            $table->string('rtv_number')->unique();
+            $table->string('status')->default('Pending');
+        
             $table->timestamps();
-
-            // optional foreign key to customers
-            $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
+        
+            $table->foreign('customer_id')->references('id')->on('customers'); 
         });
     }
 

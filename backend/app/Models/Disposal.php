@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\DisposalItem; // ✅ Import it here
+use App\Models\DisposalItem; // If you have related items
 
 class Disposal extends Model
 {
     use HasFactory;
+
     protected $table = 'disposals';
+
     protected $fillable = [
         'disposal_number',
         'disposal_date',
@@ -22,9 +24,10 @@ class Disposal extends Model
         'disposed_time',
         'reason',
     ];
-//     public function items()
-// {
-//     return $this->hasMany(DisposalItem::class);
-// }
 
+
+    public function items()
+    {
+        return $this->hasMany(DisposalItem::class);
+    }
 }

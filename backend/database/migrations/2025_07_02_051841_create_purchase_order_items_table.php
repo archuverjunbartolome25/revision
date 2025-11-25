@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreatePurchaseOrderItemsTable extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('purchase_order_items', function (Blueprint $table) {
@@ -15,6 +14,8 @@ class CreatePurchaseOrderItemsTable extends Migration
             $table->string('item_type');
             $table->integer('quantity');
             $table->integer('received_quantity')->default(0);
+            $table->decimal('unit_cost', 10, 2)->default(0);
+            $table->decimal('total_amount', 10, 2)->default(0);
             $table->timestamps();
 
             $table->foreign('purchase_order_id')
@@ -28,4 +29,4 @@ class CreatePurchaseOrderItemsTable extends Migration
     {
         Schema::dropIfExists('purchase_order_items');
     }
-}
+};
