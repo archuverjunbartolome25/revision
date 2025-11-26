@@ -16,7 +16,7 @@ class CreateInventoryRawmatsTable extends Migration
             $table->integer('conversion')->default(1);
             $table->integer('quantity_pieces')->default(0);
             $table->integer('low_stock_alert')->default(0);
-            $table->unsignedBigInteger('supplier_id');
+            $table->unsignedBigInteger('supplier_id')->nullable();
             $table->decimal('unit_cost', 10, 2)->default(0);
             $table->timestamps();
 

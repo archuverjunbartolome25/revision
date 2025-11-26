@@ -8,7 +8,7 @@ class InventoryRawMat extends Model
 {
     protected $table = 'inventory_rawmats';
 
-    protected $fillable = [
+protected $fillable = [
         'item',
         'unit',
         'quantity',

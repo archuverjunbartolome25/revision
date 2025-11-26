@@ -163,6 +163,9 @@ Route::prefix('production-output')->group(function () {
     Route::delete('/', [ProductionOutputController::class, 'destroyMany']);
     Route::get('raw-materials/{product}', [ProductionOutputController::class, 'getRawMaterialsByProduct']);
     Route::get('details/{batch_number}', [ProductionOutputController::class, 'showDetails']);
+
+    // * NEW ENDPOINT
+    Route::get('/by-batch', [ProductionOutputController::class, 'getAllProductionOutputByBatch']);
 });
 
 // ============================
@@ -242,5 +245,10 @@ Route::put('/inventories/{id}/update-materials', [InventoryController::class, 'u
 Route::get('inventories/finished-goods/{item}', [InventoryController::class, 'getFinishedGood']);
 Route::delete('/inventories/{id}', [InventoryController::class, 'destroy']);
 Route::post('inventories/restore/{id}', [InventoryController::class, 'restore']);
+
+// *  NEW ENDPOINTS
+Route::get('/finished-goods', [InventoryController::class, 'getAllFinishedGoods']);
+
+
 // Route::post('/upload', [PurchaseOrderController::class, 'upload']);
 

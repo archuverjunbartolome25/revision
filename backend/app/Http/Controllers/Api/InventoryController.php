@@ -111,8 +111,8 @@ public function deduct(Request $request)
 }
 
 
-public function receiveItem(Request $request)
-{
+    public function receiveItem(Request $request)
+    {
     $validated = $request->validate([
         'item' => 'required|string',
         'unit' => 'required|string',
@@ -165,80 +165,81 @@ public function receiveItem(Request $request)
         return response()->json(['message' => 'Alert quantity updated successfully']);
     }
 
-public function inventoryByYear(Request $request)
-{
-    $year = $request->query('year', now()->year);
+    public function inventoryByYear(Request $request)
+    {
+        $year = $request->query('year', now()->year);
 
-    $data = Inventory::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(quantity_pcs) as total_quantity')
-        ->whereRaw('EXTRACT(YEAR FROM created_at) = ?', [$year])
-        ->groupBy('month')
-        ->orderBy('month')
-        ->get();
+        $data = Inventory::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(quantity_pcs) as total_quantity')
+            ->whereRaw('EXTRACT(YEAR FROM created_at) = ?', [$year])
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
 
-    return response()->json($data);
-}
-public function updatePrice(Request $request, $id)
-{
-    // Validate that unit_cost is present and numeric
-    $request->validate([
-        'unit_cost' => 'required|numeric|min:0',
-    ]);
+        return response()->json($data);
+    }
+    public function updatePrice(Request $request, $id)
+    {
+        // Validate that unit_cost is present and numeric
+        $request->validate([
+            'unit_cost' => 'required|numeric|min:0',
+        ]);
 
-    $item = Inventory::find($id);
+        $item = Inventory::find($id);
 
-    if (!$item) {
-        return response()->json(['message' => 'Item not found'], 404);
+        if (!$item) {
+            return response()->json(['message' => 'Item not found'], 404);
+        }
+
+        $item->unit_cost = $request->unit_cost;
+        $item->save();
+
+        return response()->json([
+            'message' => 'Price updated successfully',
+            'data' => $item
+        ]);
+    }
+    public function updateMaterials(Request $request, $id)
+    {
+        $inventory = Inventory::findOrFail($id);
+
+        // Get materials array from request
+        $materials = $request->input('materials_needed', []);
+
+        // Save as JSON to the correct column
+        $inventory->materials_needed = json_encode($materials);
+        $inventory->save();
+
+        return response()->json([
+            'message' => 'Materials updated successfully',
+            'data' => $inventory
+        ]);
+    }
+    public function finishedGoods()
+    {
+        // Return all items in inventories as finished goods
+        $finishedGoods = Inventory::all()
+            ->map(function($item) {
+                $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+                return $item;
+            });
+
+        return response()->json($finishedGoods);
     }
 
-    $item->unit_cost = $request->unit_cost;
-    $item->save();
+    public function getFinishedGood($itemName)
+    {
+        // Fetch by item name instead of ID
+        $item = Inventory::where('item', $itemName)->first();
 
-    return response()->json([
-        'message' => 'Price updated successfully',
-        'data' => $item
-    ]);
-}
-public function updateMaterials(Request $request, $id)
-{
-    $inventory = Inventory::findOrFail($id);
+        if (!$item) {
+            return response()->json(['message' => 'Product not found'], 404);
+        }
 
-    // Get materials array from request
-    $materials = $request->input('materials_needed', []);
+        $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
 
-    // Save as JSON to the correct column
-    $inventory->materials_needed = json_encode($materials);
-    $inventory->save();
-
-    return response()->json([
-        'message' => 'Materials updated successfully',
-        'data' => $inventory
-    ]);
-}
-public function finishedGoods()
-{
-    // Return all items in inventories as finished goods
-    $finishedGoods = Inventory::all()
-        ->map(function($item) {
-            $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
-            return $item;
-        });
-
-    return response()->json($finishedGoods);
-}
-
-public function getFinishedGood($itemName)
-{
-    // Fetch by item name instead of ID
-    $item = Inventory::where('item', $itemName)->first();
-
-    if (!$item) {
-        return response()->json(['message' => 'Product not found'], 404);
+        return response()->json($item);
     }
 
-    $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
-
-    return response()->json($item);
-}
 
     public function destroy($id)
     {
@@ -271,4 +272,37 @@ public function getFinishedGood($itemName)
         return response()->json(['message' => 'Item restored successfully']);
     }
 
+
+    // * NEW METHODS
+    public function getAllFinishedGoods()
+    {
+        try {
+            $items = Inventory::all();
+
+            if ($items->isEmpty()) {
+                return response()->json([
+                    'message' => 'No finished goods found',
+                    'data' => []
+                ], 404);
+            }
+
+            // Decode materials_needed for each item
+            $items->transform(function ($item) {
+                $item->materials_needed = $item->materials_needed
+                    ? json_decode($item->materials_needed, true)
+                    : [];
+                return $item;
+            });
+
+            // Return pure list
+            return response()->json($items, 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while fetching finished goods',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
+
+

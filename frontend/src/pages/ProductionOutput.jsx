@@ -22,6 +22,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { formatDateOnly } from "../helpers/formatDate";
 import { formatNumber } from "../helpers/formatNumber.js";
+import { formatFirstLetterToUppercase } from "../helpers/formatText.js";
 
 function ProductionOutput() {
 	const roles = {
@@ -80,6 +81,10 @@ function ProductionOutput() {
 	const storedRole = localStorage.getItem("role");
 	const canAccess = (module) => roles[module]?.includes(storedRole);
 
+	// FETCHED FINISHED GOODS
+	const [finishedGoods, setFinishedGoods] = useState([]);
+	// const [finishedGoods, setFinishedGoods] = useState([]);
+
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // 🆕 add this
 	const [selectedDate, setSelectedDate] = useState("");
 
@@ -102,32 +107,19 @@ function ProductionOutput() {
 		}
 
 		try {
-			// Fetch pcs_per_unit for all selected products
-			const pcsData = await Promise.all(
-				validItems.map(async (item) => {
-					const res = await api.get(
-						`/api/inventories/finished-goods/${item.product}`
-					);
-					return {
-						product: item.product,
-						pcs_per_unit: res.data.pcs_per_unit || 1,
-					};
-				})
-			);
-
 			const summary = validItems.map((item) => {
-				const productInfo = pcsData.find((p) => p.product === item.product);
-				const pcsPerUnit = productInfo?.pcs_per_unit || 1;
+				// NOTE FOR DYANMIC APPROACH LATER:
+				// const pcsPerUnit = item.finishedGood?.pcs_per_unit || 1;
+				// const quantity_pcs = qty * pcsPerUnit;
 				const qty = parseInt(item.quantity);
-				const quantity_pcs = item.unit === "cases" ? qty * pcsPerUnit : qty;
-
 				const rawMaterials = (item.rawMaterials || []).map((rm) => ({
 					...rm,
-					quantity: quantity_pcs, // use dynamic pcs_per_unit
+					// quantity: quantity_pcs, // use dynamic pcs_per_unit
+					quantity: qty,
 					selectedSupplier: rm.selectedSupplier || rm.suppliers?.[0] || "",
 				}));
 
-				return { ...item, quantity_pcs, rawMaterials };
+				return { ...item, quantity_pcs: qty, rawMaterials };
 			});
 
 			setSummaryData(summary);
@@ -148,30 +140,11 @@ function ProductionOutput() {
 	};
 
 	const [addedItems, setAddedItems] = useState([
-		{ product: "", unit: "", quantity: "" },
+		{ product: "", unit: "pieces", quantity: "" },
 	]);
 	const [productionList, setProductionList] = useState([
 		{ product: "", unit: "", quantity: "" },
 	]);
-
-	const handleAddRow = () => {
-		setProductionList([
-			...productionList,
-			{ product: "", unit: "", quantity: "" },
-		]);
-	};
-
-	const handleRemoveRow = (index) => {
-		const updated = [...productionList];
-		updated.splice(index, 1);
-		setProductionList(updated);
-	};
-
-	const handleChange = (index, field, value) => {
-		const updated = [...productionList];
-		updated[index][field] = value;
-		setProductionList(updated);
-	};
 
 	const handleSaveProduction = async () => {
 		const validItems = productionList.filter(
@@ -232,11 +205,11 @@ function ProductionOutput() {
 
 	const handleRowClick = async (record) => {
 		try {
+			// ! BUGGED: OLD WAY RETURNS BOTH PRODUCT OF THAT BATCH (BECOMES REDUNDANT BECAUSE THERE ARE 2 BATCH SHOWN IN THE)
 			const res = await api.get(
 				`/api/production-output/details/${record.batch_number}`
 			);
 			const bomData = res.data; // Array from backend
-			console.log("BOM data from backend:", bomData);
 
 			// Group materials by product → supplier
 			const formattedBOM = bomData.map((prod) => {
@@ -299,6 +272,8 @@ function ProductionOutput() {
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 8;
 
+	// !IMPORTANT YUNG RAW MATS WALANG SUPPLIER ID UPON CREATION. (DAPAT IADD YUNG SUPPLIER ID SA MAY SUPPLIER OFFERS) OR SA PRODUCTION OUTPUT DUN NA SIYA TUMINGIN AND WAG NA SA SUPPLIER ID SA RAWMATS MISMO SINCE PEDE SIYA MARAMING SUPPLIER.
+	// ! WALANG VALIDATION NA PAG KULANG  YUNG QUANTITY PIECES HINDI PEDE MAG PRODUCE
 	const indexOfLastItem = currentPage * itemsPerPage;
 	const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 
@@ -332,25 +307,66 @@ function ProductionOutput() {
 		// Your backend call goes here
 	};
 
+	// const handleAddProduction = async (item, batchNum) => {
+	// 	try {
+	// 		const { product, unit, quantity, rawMaterials } = item;
+
+	// 		if (!product || !unit || !quantity) {
+	// 			showMessage("❌ Please complete all fields before saving.");
+	// 			return;
+	// 		}
+
+	// 		const pcsPerCaseMap = { "350ml": 24, "500ml": 24, "1L": 12, "6L": 1 };
+	// 		const quantity_pcs =
+	// 			unit === "cases"
+	// 				? parseInt(quantity) * (pcsPerCaseMap[product] || 1)
+	// 				: parseInt(quantity);
+
+	// 		const formattedRawMaterials = (rawMaterials || []).map((rm) => ({
+	// 			name: rm.material,
+	// 			supplier: rm.selectedSupplier || rm.suppliers?.[0] || "Unknown",
+	// 			quantity: rm.quantity || quantity_pcs, // fallback if missing
+	// 		}));
+
+	// 		const payload = {
+	// 			batch_number: batchNum,
+	// 			employee_id: employeeID,
+	// 			products: [
+	// 				{
+	// 					product_name: product,
+	// 					unit,
+	// 					quantity_pcs,
+	// 					rawMaterials: formattedRawMaterials,
+	// 				},
+	// 			],
+	// 		};
+
+	// 		await api.post("/api/production-output/add", payload);
+	// 		showMessage(`✅ ${product} added successfully!`);
+	// 	} catch (error) {
+	// 		console.error("Error adding production:", error.response?.data || error);
+	// 		showMessage("❌ Failed to add production output.");
+	// 	}
+	// };
+
 	const handleAddProduction = async (item, batchNum) => {
 		try {
-			const { product, unit, quantity, rawMaterials } = item;
+			console.log(item);
+
+			const { product, unit, quantity, rawMaterials, finishedGood } = item;
 
 			if (!product || !unit || !quantity) {
-				showMessage("❌ Please complete all fields before saving.");
+				showMessage("Please complete all fields before saving.");
 				return;
 			}
 
-			const pcsPerCaseMap = { "350ml": 24, "500ml": 24, "1L": 12, "6L": 1 };
-			const quantity_pcs =
-				unit === "cases"
-					? parseInt(quantity) * (pcsPerCaseMap[product] || 1)
-					: parseInt(quantity);
+			const quantity_pcs = Number(quantity) * 1;
 
 			const formattedRawMaterials = (rawMaterials || []).map((rm) => ({
 				name: rm.material,
-				supplier: rm.selectedSupplier || rm.suppliers?.[0] || "Unknown",
-				quantity: rm.quantity || quantity_pcs, // fallback if missing
+				supplier:
+					rm.selectedSupplier || rm.suppliers?.[0]?.supplier_name || "Unknown",
+				quantity: Number(quantity),
 			}));
 
 			const payload = {
@@ -366,11 +382,12 @@ function ProductionOutput() {
 				],
 			};
 
+			console.log(payload);
 			await api.post("/api/production-output/add", payload);
-			showMessage(`✅ ${product} added successfully!`);
+			showMessage(`${product} added successfully!`);
 		} catch (error) {
 			console.error("Error adding production:", error.response?.data || error);
-			showMessage("❌ Failed to add production output.");
+			showMessage("Failed to add production output.");
 		}
 	};
 
@@ -404,9 +421,9 @@ function ProductionOutput() {
 		try {
 			setLoading(true);
 			const res = await axios.get(
-				"http://localhost:8000/api/production-output",
+				"http://localhost:8000/api/production-output/by-batch",
 				{
-					params: selectedDate ? { date: selectedDate } : {}, // ✅ filter by date if selected
+					params: selectedDate ? { date: selectedDate } : {},
 				}
 			);
 			setOrders(res.data);
@@ -424,7 +441,7 @@ function ProductionOutput() {
 
 	useEffect(() => {
 		fetchOrders();
-	}, []);
+	}, [selectedDate]);
 
 	const showMessage = (message) => {
 		setSuccessMessage(message);
@@ -487,13 +504,13 @@ function ProductionOutput() {
 			showMessage("❌ Failed to add product.");
 		}
 	};
-	const [finishedGoods, setFinishedGoods] = useState([]);
 
 	useEffect(() => {
 		const fetchFinishedGoods = async () => {
 			try {
-				const res = await api.get("/api/inventories/finished-goods"); // adjust API endpoint
-				setFinishedGoods(res.data); // res.data should be an array of products, e.g., ["350ml", "500ml", "1L", "6L"]
+				// const res = await api.get("/api/inventories/finished-goods");
+				const res = await api.get("/api/finished-goods");
+				setFinishedGoods(res.data);
 			} catch (err) {
 				console.error("Failed to fetch finished goods:", err);
 				showMessage("❌ Failed to load finished goods.");
@@ -799,7 +816,7 @@ function ProductionOutput() {
 								setBatchNumber(generateBatchNumber());
 
 								// Reset modal state for a fresh start
-								setAddedItems([{ product: "", unit: "", quantity: "" }]);
+								setAddedItems([{ product: "", unit: "pieces", quantity: "" }]);
 								setSelectedItemForSuppliers(null);
 								setSummaryData([]);
 
@@ -967,104 +984,134 @@ function ProductionOutput() {
 							<strong>Batch Number:</strong> {batchNumber}
 						</div>
 
-						{addedItems.map((item, index) => (
-							<div key={index} className="mb-3 p-2 border rounded">
-								<div className="mb-2">
-									<label className="form-label">Item</label>
-									<select
-										className="form-select"
-										value={item.product}
-										onChange={async (e) => {
-											const selectedProduct = e.target.value;
-											const updatedItems = [...addedItems];
-											updatedItems[index].product = selectedProduct;
-											setAddedItems(updatedItems);
+						{addedItems.map((item, index) => {
+							const selectedFinishedGoodUnit = finishedGoods.find(
+								(prod) => prod.item === item.product
+							);
 
-											try {
-												// Fetch raw materials with dynamic BOM
-												const res = await axios.get(
-													`http://localhost:8000/api/raw-materials/by-product/${selectedProduct}`
+							return (
+								<div key={index} className="mb-3 p-2 border rounded">
+									<div className="mb-2">
+										<label className="form-label">Item</label>
+										<select
+											className="form-select"
+											value={item.product}
+											onChange={async (e) => {
+												const selectedProduct = e.target.value;
+
+												const finishedGoodObject = finishedGoods.find(
+													(prod) => prod.item === selectedProduct
 												);
 
-												// Parse materials_needed from backend
-												const rawMaterialsData = res.data.map((rm) => ({
-													...rm,
-													materials_needed: rm.materials_needed
-														? JSON.parse(rm.materials_needed) // parse JSON string
-														: [],
-												}));
+												const updatedItems = [...addedItems];
+												updatedItems[index].product = selectedProduct;
+												updatedItems[index].finishedGood = finishedGoodObject;
 
-												setSelectedItemForSuppliers({
-													index,
-													product: selectedProduct,
-													rawMaterials: rawMaterialsData,
-												});
-												setShowSupplierModal(true); // open supplier modal dynamically
-											} catch (err) {
-												console.error("Failed to fetch raw materials:", err);
-												showMessage(
-													"❌ Failed to fetch raw materials for this product."
-												);
-											}
-										}}
+												setAddedItems(updatedItems);
+
+												try {
+													// Fetch raw materials with dynamic BOM
+													const res = await axios.get(
+														`http://localhost:8000/api/raw-materials/by-product/${selectedProduct}`
+													);
+
+													// Parse materials_needed from backend
+													const rawMaterialsData = res.data.map((rm) => ({
+														...rm,
+														materials_needed: rm.materials_needed
+															? JSON.parse(rm.materials_needed) // parse JSON string
+															: [],
+													}));
+
+													setSelectedItemForSuppliers({
+														index,
+														product: selectedProduct,
+														rawMaterials: rawMaterialsData,
+													});
+													setShowSupplierModal(true); // open supplier modal dynamically
+												} catch (err) {
+													console.error("Failed to fetch raw materials:", err);
+													showMessage(
+														"❌ Failed to fetch raw materials for this product."
+													);
+												}
+											}}
+										>
+											<option value="">Select Item</option>
+											{finishedGoods.map((product) => (
+												<option
+													key={product.id}
+													value={product.item_name || product.item}
+												>
+													{product.item_name || product.item}
+												</option>
+											))}
+										</select>
+									</div>
+
+									{/* 
+									<div className="mb-2">
+										<label className="form-label">Unit</label>
+										<select
+											className="form-select"
+											value={item.unit}
+											disabled={!selectedFinishedGoodUnit}
+											onChange={(e) => {
+												const updated = [...addedItems];
+												updated[index].unit = e.target.value;
+												updated[index].quantity = "";
+												setAddedItems(updated);
+											}}
+										>
+											<option value="">Select Unit</option>
+											{selectedFinishedGoodUnit?.unit &&
+											selectedFinishedGoodUnit.unit !== "pcs" &&
+											selectedFinishedGoodUnit.unit !== "pieces" ? (
+												<option
+													value={selectedFinishedGoodUnit?.unit}
+													disabled={!selectedFinishedGoodUnit.unit}
+												>
+													{`${formatFirstLetterToUppercase(
+														selectedFinishedGoodUnit.unit || "N/A"
+													)} (${
+														selectedFinishedGoodUnit.pcs_per_unit
+													} pcs per ${selectedFinishedGoodUnit.unit})`}
+												</option>
+											) : null}
+											<option value="pieces">Pieces</option>
+										</select>
+									</div> */}
+
+									<div className="mb-2">
+										<label className="form-label">Quantity by pieces</label>
+										<input
+											type="number"
+											min="0"
+											className="form-control"
+											disabled={!item.unit}
+											// placeholder={`Enter quantity in ${item.unit || "unit"}`}
+											placeholder={`Enter quantity`}
+											value={item.quantity}
+											onChange={(e) => {
+												const updated = [...addedItems];
+												updated[index].quantity = e.target.value;
+												setAddedItems(updated);
+											}}
+										/>
+									</div>
+
+									<button
+										type="button"
+										className="btn btn-danger btn-sm mt-2"
+										onClick={() =>
+											setAddedItems(addedItems.filter((_, i) => i !== index))
+										}
 									>
-										<option value="">Select Item</option>
-										{finishedGoods.map((product) => (
-											<option
-												key={product.id}
-												value={product.item_name || product.item}
-											>
-												{product.item_name || product.item}
-											</option>
-										))}
-									</select>
+										Remove
+									</button>
 								</div>
-
-								<div className="mb-2">
-									<label className="form-label">Unit</label>
-									<select
-										className="form-select"
-										value={item.unit}
-										onChange={(e) => {
-											const updated = [...addedItems];
-											updated[index].unit = e.target.value;
-											updated[index].quantity = "";
-											setAddedItems(updated);
-										}}
-									>
-										<option value="">Select Unit</option>
-										<option value="cases">Cases</option>
-										<option value="pieces">Pieces</option>
-									</select>
-								</div>
-
-								<div className="mb-2">
-									<label className="form-label">Quantity</label>
-									<input
-										type="number"
-										min="0"
-										className="form-control"
-										placeholder={`Enter ${item.unit || "quantity"}`}
-										value={item.quantity}
-										onChange={(e) => {
-											const updated = [...addedItems];
-											updated[index].quantity = e.target.value;
-											setAddedItems(updated);
-										}}
-									/>
-								</div>
-
-								<button
-									type="button"
-									className="btn btn-danger btn-sm mt-2"
-									onClick={() =>
-										setAddedItems(addedItems.filter((_, i) => i !== index))
-									}
-								>
-									Remove
-								</button>
-							</div>
-						))}
+							);
+						})}
 
 						<div className="d-flex justify-content-between mt-2">
 							<button
@@ -1248,10 +1295,10 @@ function ProductionOutput() {
 									for (const item of summaryData) {
 										await handleAddProduction(item, batchNumber);
 									}
-									fetchOrders();
-									setAddedItems([{ product: "", unit: "", quantity: "" }]);
-									setShowAddModal(false);
-									setShowSummaryModal(false);
+									// fetchOrders();
+									// setAddedItems([{ product: "", unit: "", quantity: "" }]);
+									// setShowAddModal(false);
+									// setShowSummaryModal(false);
 								}}
 							>
 								Confirm & Save
