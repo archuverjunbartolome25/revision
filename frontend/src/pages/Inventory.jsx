@@ -522,8 +522,6 @@ function Inventory() {
 	// Render
 	// -----------------------------
 
-	console.log(currentItems);
-
 	return (
 		<div
 			className={`dashboard-container ${

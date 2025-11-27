@@ -1426,8 +1426,8 @@ function PurchaseOrder() {
 							<thead>
 								<tr>
 									<th>Item Name</th>
-									<th>Ordered Qty</th>
-									<th>Received Qty</th>
+									<th>Ordered Qty(pcs)</th>
+									<th>Received Qty(pcs)</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -1520,7 +1520,7 @@ function PurchaseOrder() {
 								<tr>
 									<th>Item</th>
 									<th>Ordered</th>
-									<th>New Receive</th>
+									<th>Received(pcs)</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -1532,7 +1532,7 @@ function PurchaseOrder() {
 											<td>
 												{itemDisplayNames[item.item_name] || item.item_name}
 											</td>
-											<td>{item.quantity}</td>
+											<td>{item.quantity} pcs</td>
 											<td>
 												<input
 													type="number"
@@ -1551,7 +1551,7 @@ function PurchaseOrder() {
 													}}
 												/>
 												<small className="text-muted">
-													Remaining: {remainingQty}
+													Remaining: {remainingQty} pcs
 												</small>
 											</td>
 										</tr>
@@ -1652,7 +1652,7 @@ function PurchaseOrder() {
 							<thead>
 								<tr>
 									<th style={{ width: "30%" }}>Item</th>
-									<th style={{ width: "15%" }}>Qty</th>
+									<th style={{ width: "15%" }}>Qty(pcs)</th>
 									<th style={{ width: "12%" }}>Unit Price</th>
 									<th style={{ width: "13%" }}>Total Price</th>
 									<th style={{ width: "10%" }}>Delete</th>

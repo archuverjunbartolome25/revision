@@ -23,6 +23,7 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { formatNumber } from "../helpers/formatNumber";
 
 function ReturnToVendor() {
+	const today = new Date();
 	const roles = {
 		dashboard: [
 			"Inventory Custodian",
@@ -170,8 +171,8 @@ function ReturnToVendor() {
 	const [newReturn, setNewReturn] = useState({
 		customer_id: "",
 		location: "",
-		date_ordered: "",
-		date_returned: "",
+		date_ordered: new Date().toISOString().split("T")[0],
+		date_returned: new Date().toISOString().split("T")[0],
 		products: [], // array of { product_id, quantity }
 		status: "Pending",
 	});
@@ -292,6 +293,7 @@ function ReturnToVendor() {
 	useEffect(() => {
 		fetchOrders();
 		fetchCustomers();
+		fetchInventoryItems();
 	}, []);
 
 	const handleSelectAll = (e) => {
@@ -335,12 +337,6 @@ function ReturnToVendor() {
 			console.error("Error fetching inventories:", err);
 		}
 	};
-
-	useEffect(() => {
-		fetchOrders();
-		fetchCustomers();
-		fetchInventoryItems();
-	}, []);
 
 	return (
 		<div
@@ -564,8 +560,8 @@ function ReturnToVendor() {
 								setNewReturn({
 									customer_id: "",
 									location: "",
-									date_ordered: "",
-									date_returned: "",
+									date_ordered: new Date().toISOString().split("T")[0],
+									date_returned: new Date().toISOString().split("T")[0],
 									products: [], // dynamic products array
 								});
 
@@ -777,6 +773,7 @@ function ReturnToVendor() {
 							</label>
 							<input
 								className="form-control"
+								placeholder="Location"
 								value={newReturn.location || ""}
 								readOnly
 							/>
@@ -834,7 +831,7 @@ function ReturnToVendor() {
 								<input
 									type="number"
 									className="form-control"
-									placeholder="Quantity"
+									placeholder="Quantity in pieces"
 									value={p.quantity}
 									onChange={(e) =>
 										handleProductChange(index, "quantity", e.target.value)
@@ -934,7 +931,7 @@ function ReturnToVendor() {
 								<tr>
 									<th>Item</th>
 									<th>Unit</th>
-									<th>Quantity</th>
+									<th>Qty(pcs)</th>
 								</tr>
 							</thead>
 							<tbody>

@@ -134,7 +134,7 @@ class InventoryRawmatsSeeder extends Seeder
                 'low_stock_alert' => 20,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'unit_cost' => 7960.00,
+                'unit_cost' => 1.00,
                 'supplier_id' => 3, // Royalseal
             ],
             [
@@ -147,7 +147,7 @@ class InventoryRawmatsSeeder extends Seeder
                 'low_stock_alert' => 20,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'unit_cost' => 5960.00,
+                'unit_cost' => 2.00,
                 'supplier_id' => 4, // Shrinkpack (same item, different supplier)
             ],
             // Films

@@ -21,7 +21,7 @@ import { BiPurchaseTag } from "react-icons/bi";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { formatDateOnly } from "../helpers/formatDate";
-import { formatNumber } from "../helpers/formatNumber.js";
+import { formatNumber, formatToPeso } from "../helpers/formatNumber.js";
 import { formatFirstLetterToUppercase } from "../helpers/formatText.js";
 
 function ProductionOutput() {
@@ -98,7 +98,7 @@ function ProductionOutput() {
 
 	const handlePrepareSummary = async () => {
 		const validItems = addedItems.filter(
-			(item) => item.product && item.unit && item.quantity
+			(item) => item.product && item.quantity
 		);
 
 		if (validItems.length === 0) {
@@ -119,7 +119,7 @@ function ProductionOutput() {
 					selectedSupplier: rm.selectedSupplier || rm.suppliers?.[0] || "",
 				}));
 
-				return { ...item, quantity_pcs: qty, rawMaterials };
+				return { ...item, unit: "pieces", quantity_pcs: qty, rawMaterials };
 			});
 
 			setSummaryData(summary);
@@ -206,9 +206,13 @@ function ProductionOutput() {
 	const handleRowClick = async (record) => {
 		try {
 			// ! BUGGED: OLD WAY RETURNS BOTH PRODUCT OF THAT BATCH (BECOMES REDUNDANT BECAUSE THERE ARE 2 BATCH SHOWN IN THE)
+			// const res = await api.get(
+			// 	`/api/production-output/details/${record.batch_number}`
+			// );
 			const res = await api.get(
-				`/api/production-output/details/${record.batch_number}`
+				`/api/production-output/${record.batch_number}`
 			);
+
 			const bomData = res.data; // Array from backend
 
 			// Group materials by product → supplier
@@ -272,8 +276,6 @@ function ProductionOutput() {
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 8;
 
-	// !IMPORTANT YUNG RAW MATS WALANG SUPPLIER ID UPON CREATION. (DAPAT IADD YUNG SUPPLIER ID SA MAY SUPPLIER OFFERS) OR SA PRODUCTION OUTPUT DUN NA SIYA TUMINGIN AND WAG NA SA SUPPLIER ID SA RAWMATS MISMO SINCE PEDE SIYA MARAMING SUPPLIER.
-	// ! WALANG VALIDATION NA PAG KULANG  YUNG QUANTITY PIECES HINDI PEDE MAG PRODUCE
 	const indexOfLastItem = currentPage * itemsPerPage;
 	const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 
@@ -351,8 +353,6 @@ function ProductionOutput() {
 
 	const handleAddProduction = async (item, batchNum) => {
 		try {
-			console.log(item);
-
 			const { product, unit, quantity, rawMaterials, finishedGood } = item;
 
 			if (!product || !unit || !quantity) {
@@ -382,7 +382,6 @@ function ProductionOutput() {
 				],
 			};
 
-			console.log(payload);
 			await api.post("/api/production-output/add", payload);
 			showMessage(`${product} added successfully!`);
 		} catch (error) {
@@ -1088,7 +1087,6 @@ function ProductionOutput() {
 											type="number"
 											min="0"
 											className="form-control"
-											disabled={!item.unit}
 											// placeholder={`Enter quantity in ${item.unit || "unit"}`}
 											placeholder={`Enter quantity`}
 											value={item.quantity}
@@ -1295,10 +1293,10 @@ function ProductionOutput() {
 									for (const item of summaryData) {
 										await handleAddProduction(item, batchNumber);
 									}
-									// fetchOrders();
-									// setAddedItems([{ product: "", unit: "", quantity: "" }]);
-									// setShowAddModal(false);
-									// setShowSummaryModal(false);
+									fetchOrders();
+									setAddedItems([{ product: "", unit: "", quantity: "" }]);
+									setShowAddModal(false);
+									setShowSummaryModal(false);
 								}}
 							>
 								Confirm & Save
@@ -1360,41 +1358,87 @@ function ProductionOutput() {
 									: "N/A"}
 							</p>
 
-							{selectedProduction?.materials_needed?.map((prod, i) => (
-								<div key={i} className="mb-3">
-									<p>
-										<strong>{prod.product_name} - Raw Materials</strong>
-									</p>
+							<p>
+								<strong>Products:</strong> <br />
+							</p>
+							{selectedProduction?.materials_needed?.map((prod, i) => {
+								const allMaterials = prod.materials_grouped.flatMap(
+									(item) => item.materials
+								);
 
-									{prod.materials_grouped.map((grp, gIdx) => (
-										<div key={gIdx}>
-											<p>
-												<strong>Supplier:</strong> {grp.supplier}
-											</p>
-											<table className="table table-bordered table-sm">
-												<thead>
+								return (
+									<div key={i} className="mb-3">
+										<p className="fw-bold text-black mb-2">
+											{i + 1}. {prod.product_name} - Raw Materials
+										</p>
+
+										<table className="table table-bordered table-sm">
+											<thead>
+												<tr>
+													<th>Material</th>
+													<th>Supplier</th>
+													<th>Qty(pcs)</th>
+													<th>Unit Price</th>
+													<th>Total Price</th>
+												</tr>
+											</thead>
+											<tbody>
+												{allMaterials && allMaterials.length > 0 ? (
+													allMaterials.map((material, mIdx) => {
+														return (
+															<tr key={mIdx}>
+																<td>{material.material}</td>
+																<td>{material.supplier}</td>
+																<td>{formatNumber(material.quantity_pcs)}</td>
+																<td>
+																	{formatToPeso(
+																		formatToPeso(material.unit_price)
+																	)}
+																</td>
+																<td>{formatToPeso(material.total)}</td>
+															</tr>
+														);
+													})
+												) : (
 													<tr>
-														<th>Material</th>
-														<th>Quantity</th>
+														<td colSpan="5" className="text-center text-muted">
+															No materials found
+														</td>
 													</tr>
-												</thead>
-												<tbody>
-													{grp.materials.map((m, mIdx) => (
-														<tr key={mIdx}>
-															<td>{m.material}</td>
-															<td>{formatNumber(m.qty)}</td>
-														</tr>
-													))}
-												</tbody>
-											</table>
-										</div>
-									))}
-								</div>
-							))}
+												)}
+											</tbody>
+											<tfoot>
+												<tr>
+													<td colSpan="4" className="text-start">
+														<strong>Total Material Cost:</strong>
+													</td>
+													<td>
+														<strong>
+															{formatToPeso(
+																allMaterials?.reduce(
+																	(sum, m) => sum + (m.total || 0),
+																	0
+																) || 0
+															)}
+														</strong>
+													</td>
+												</tr>
+											</tfoot>
+										</table>
+									</div>
+								);
+							})}
 						</div>
 					</div>
 				</div>
 			)}
+			{/* <tbody>
+				<tr key={mIdx}>
+					<td>{materialGroups[gIdx].material}</td>
+					<td>{m.supplier}</td>
+					<td>{formatNumber(m.qty)}</td>
+				</tr>
+			</tbody> */}
 
 			{successMessage && (
 				<div className="success-message">{successMessage}</div>
