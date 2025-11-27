@@ -166,6 +166,7 @@ Route::prefix('production-output')->group(function () {
 
     // * NEW ENDPOINT
     Route::get('/by-batch', [ProductionOutputController::class, 'getAllProductionOutputByBatch']);
+    Route::get('/{batch_number}', [ProductionOutputController::class, 'getProductionOutputByBatchNumber']);
 });
 
 // ============================

@@ -26,6 +26,9 @@ import { formatNumber, formatToPeso } from "../helpers/formatNumber";
 
 function SalesOrder() {
 	const today = new Date();
+	const defaultDeliveryDate = new Date();
+	defaultDeliveryDate.setDate(today.getDate() + 7);
+
 	const yyyy = today.getFullYear();
 	const mm = String(today.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
 	const dd = String(today.getDate()).padStart(2, "0");
@@ -303,10 +306,14 @@ function SalesOrder() {
 		products: [], // each product: { product_id: "", quantity: 0, unit_price: 0 }
 		location: "",
 		customer_id: "",
-		delivery_date: "",
-		date: "",
+		delivery_date: defaultDeliveryDate.toISOString().split("T")[0],
+		date: today.toISOString().split("T")[0],
 		order_type: "Standard Order",
 	});
+
+	console.log(new Date(today.getDay() + 7).toISOString().split("T")[0]);
+
+	console.log(newOrder);
 
 	const confirmDelete = async () => {
 		const idsToDelete = selectedRows.map((index) => orders[index].id);
@@ -685,8 +692,10 @@ function SalesOrder() {
 									products: [],
 									location: "",
 									customer_id: "",
-									delivery_date: "",
-									date: "",
+									delivery_date: defaultDeliveryDate
+										.toISOString()
+										.split("T")[0],
+									date: today.toISOString().split("T")[0],
 									order_type: "Standard Order",
 								});
 								setGrandTotal(0); // Reset total for new order

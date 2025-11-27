@@ -636,7 +636,7 @@ function Disposal() {
 							onClick={() => {
 								const type = newDisposal.selectedType;
 								setNewDisposal({
-									disposal_date: "",
+									disposal_date: new Date().toISOString().split("T")[0],
 									selectedType: type,
 									items: [{ type: type, item: "", qty: 0 }],
 									productQuantities: {
@@ -875,7 +875,7 @@ function Disposal() {
 							<thead>
 								<tr>
 									<th>Item</th>
-									<th style={{ width: "150px" }}>Qty</th>
+									<th style={{ width: "150px" }}>Qty(pcs)</th>
 									<th></th>
 								</tr>
 							</thead>
@@ -908,7 +908,7 @@ function Disposal() {
 														)
 														.map((inv) => (
 															<option key={inv.id} value={inv.name}>
-																{inv.name} ({inv.supplier})
+																{inv.name}
 															</option>
 														))}
 												</select>
@@ -1058,7 +1058,7 @@ function Disposal() {
 									<tr>
 										<th>Item Type</th>
 										<th>Item</th>
-										<th>Quantity</th>
+										<th>Qty(pcs)</th>
 									</tr>
 								</thead>
 								<tbody>

@@ -433,4 +433,88 @@ foreach ($keyedMaterials as $rawItem => $usedQty) {
     
         return response()->json($batches);
     }
+
+    public function getProductionOutputByBatchNumber($batch_number)
+    {
+        $productions = DB::table('production_outputs')
+            ->where('batch_number', $batch_number)
+            ->get();
+    
+        if ($productions->isEmpty()) {
+            return response()->json([]);
+        }
+    
+        $result = [];
+    
+        foreach ($productions as $prod) {
+            // Decode JSON fields
+            $materialsNeeded = $prod->materials_needed
+                ? json_decode($prod->materials_needed, true)
+                : [];
+    
+            $selectedSuppliers = $prod->selected_suppliers
+                ? json_decode($prod->selected_suppliers, true)
+                : [];
+    
+            $materials = [];
+    
+            foreach ($materialsNeeded as $materialName => $qtyPerUnit) {
+                // Calculate total quantity needed (in pieces)
+                $totalQty = $prod->quantity_pcs;
+    
+                // Get the supplier ID for this material
+                $supplierId = $selectedSuppliers[$materialName] ?? null;
+    
+                if ($supplierId) {
+                    // Find supplier details
+                    $offer = DB::table('supplier_offers')
+                        ->join('inventory_rawmats', 'inventory_rawmats.id', '=', 'supplier_offers.rawmat_id')
+                        ->join('suppliers', 'suppliers.id', '=', 'supplier_offers.supplier_id')
+                        ->where('supplier_offers.supplier_id', $supplierId)
+                        ->whereRaw('LOWER(inventory_rawmats.item) = ?', [strtolower($materialName)])
+                        ->select(
+                            'inventory_rawmats.item as material',
+                            'suppliers.name as supplier',
+                            'supplier_offers.price as unit_price'
+                        )
+                        ->first();
+    
+                    if ($offer) {
+                        $materials[] = [
+                            'material'       => $offer->material,
+                            'supplier'       => $offer->supplier,
+                            'quantity'       => $totalQty,
+                            'quantity_pcs'   => $prod->quantity_pcs, // ✅ Added here
+                            'unit_price'     => round($offer->unit_price, 2),
+                            'total'          => round($offer->unit_price * $totalQty, 2),
+                        ];
+                        continue;
+                    }
+                }
+    
+                // Fallback: try to find material without supplier match
+                $rawmat = DB::table('inventory_rawmats')
+                    ->whereRaw('LOWER(item) = ?', [strtolower($materialName)])
+                    ->first();
+    
+                $materials[] = [
+                    'material'       => $rawmat ? $rawmat->item : $materialName,
+                    'supplier'       => 'No Supplier Assigned',
+                    'quantity'       => $totalQty,
+                    'quantity_pcs'   => $prod->quantity_pcs, // ✅ Added here too
+                    'unit_price'     => 0,
+                    'total'          => 0,
+                ];
+            }
+    
+            $result[] = [
+                'product_name'   => $prod->product_name,
+                'batch_number'   => $prod->batch_number,
+                'quantity_pcs'   => $prod->quantity_pcs, // Overall product count
+                'materials'      => $materials,
+            ];
+        }
+    
+        return response()->json($result);
+    }
 }
