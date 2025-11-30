@@ -15,7 +15,9 @@ import {
 	FaShoppingCart,
 	FaBoxes,
 	FaRegUser,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useNavigate } from "react-router-dom";
@@ -80,6 +82,9 @@ function ReturnToVendorReport() {
 
 	const [reportType, setReportType] = useState("All");
 	const [filterValue, setFilterValue] = useState("");
+
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
 
@@ -123,6 +128,20 @@ function ReturnToVendorReport() {
 
 	const isReportsActive = location.pathname.startsWith("/reports");
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -144,6 +163,8 @@ function ReturnToVendorReport() {
 				console.error("Error fetching user data:", err);
 			}
 		};
+
+		fetchNotification();
 		fetchUserData();
 	}, []);
 
@@ -180,7 +201,21 @@ function ReturnToVendorReport() {
 	}, []);
 
 	const filteredReturns = returns.filter((r) => {
-		if (reportType === "All" || !filterValue) return true; // ✅ Show all by default
+		const term = searchTerm.toLowerCase();
+
+		if (searchTerm.trim() !== "") {
+			const matchesSearch =
+				r.customer?.name?.toLowerCase().includes(term) ||
+				r.location?.toLowerCase().includes(term) ||
+				r.rtv_number?.toLowerCase().includes(term) ||
+				r.status?.toLowerCase().includes(term) ||
+				r.date_returned?.toLowerCase().includes(term);
+
+			if (!matchesSearch) return false;
+		}
+
+		if (reportType === "All" || !filterValue) return true;
+
 		const date = new Date(r.date_returned);
 
 		if (reportType === "Daily") {
@@ -206,6 +241,7 @@ function ReturnToVendorReport() {
 		if (reportType === "Yearly") {
 			return date.getFullYear().toString() === filterValue;
 		}
+
 		return true;
 	});
 
@@ -419,7 +455,45 @@ function ReturnToVendorReport() {
 							</div>
 						</div>
 					</div>
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							defaultValue=""
@@ -460,6 +534,14 @@ function ReturnToVendorReport() {
 
 				{/* Filters */}
 				<div className="d-flex align-items-center gap-2 mb-3">
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search"
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+					/>
 					<label className="fw-bold me-2">Report Type:</label>
 					<select
 						className="custom-select"

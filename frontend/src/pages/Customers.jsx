@@ -13,7 +13,9 @@ import {
 	FaRegUser,
 	FaListUl,
 	FaEdit,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { TbReportSearch } from "react-icons/tb";
 import { MdOutlineDashboard } from "react-icons/md";
 import { MdOutlineInventory2 } from "react-icons/md";
@@ -107,6 +109,9 @@ function Customers() {
 	const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 	const [selectedEditCustomer, setSelectedEditCustomer] = useState(null);
 
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
 	const [userFullName, setUserFullName] = useState("");
 	const [userFirstName, setUserFirstName] = useState("");
 	const [employeeID, setEmployeeID] = useState("");
@@ -137,6 +142,20 @@ function Customers() {
 		}
 	};
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -162,7 +181,7 @@ function Customers() {
 				console.error("Error fetching user data:", error);
 			}
 		};
-
+		fetchNotification();
 		fetchUserData();
 	}, []);
 
@@ -464,7 +483,45 @@ function Customers() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {

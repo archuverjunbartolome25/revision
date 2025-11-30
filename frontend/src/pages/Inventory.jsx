@@ -13,6 +13,7 @@ import {
 	FaListUl,
 	FaUndo,
 	FaTrashAlt,
+	FaBell,
 } from "react-icons/fa";
 import { TbReportSearch } from "react-icons/tb";
 import { MdOutlineDashboard } from "react-icons/md";
@@ -25,6 +26,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { formatToPeso } from "../helpers/formatNumber.Js";
 import { formatNumber } from "../helpers/formatNumber.Js";
+import NotificationDropdown from "../components/NotificationDropdown";
 
 function Inventory() {
 	const roles = {
@@ -97,8 +99,10 @@ function Inventory() {
 		const fetchRawMaterials = async () => {
 			try {
 				const res = await axios.get(
-					"http://localhost:8000/api/inventory_rawmats"
+					"http://localhost:8000/api/inventory_rawmats/with-suppliers"
+					// "http://localhost:8000/api/inventory_rawmats/"
 				);
+
 				setRawInventoryData(res.data);
 			} catch (err) {
 				console.error("Error fetching raw materials:", err);
@@ -109,12 +113,6 @@ function Inventory() {
 	}, []);
 
 	const [loading, setLoading] = useState(true);
-	// -----------------------------
-	// Refs & State
-	// -----------------------------
-	const submenuRef = useRef(null);
-	const location = useLocation();
-	const isReportsActive = location.pathname.startsWith("/reports");
 
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [showAlertModal, setShowAlertModal] = useState(false);
@@ -122,7 +120,6 @@ function Inventory() {
 	const [selectedItem, setSelectedItem] = useState(null);
 	const [newAlertQty, setNewAlertQty] = useState("");
 
-	const [reportsOpen, setReportsOpen] = useState(false);
 	const [overviewOpen, setOverviewOpen] = useState(false);
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
@@ -137,8 +134,11 @@ function Inventory() {
 	const [employeeID, setEmployeeID] = useState("");
 	const [successMessage, setSuccessMessage] = useState("");
 	const [showBOMModal, setShowBOMModal] = useState(false);
-	const [bomItems, setBOMItems] = useState([]);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+	const [materialsNeeded, setMaterialsNeeded] = useState([]);
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
 	const handleDeleteProduct = async () => {
 		if (!selectedFinishedGood) return;
@@ -162,44 +162,14 @@ function Inventory() {
 		}
 	};
 
-	const [selectedFinishedGoodPrice, setSelectedFinishedGoodPrice] = useState(0);
-	const [isEditingPrice, setIsEditingPrice] = useState(false);
-
 	const [showAddMaterialsModal, setShowAddMaterialsModal] = useState(false);
-	const [showAddMaterials, setShowAddMaterials] = useState(false);
-	const [selectedMaterials, setSelectedMaterials] = useState([]);
 
 	const handleShowBOM = (item) => {
 		setSelectedFinishedGood(item);
-		setSelectedFinishedGoodPrice(item.unit_cost || 0);
+		// setSelectedFinishedGoodPrice(item.unit_cost || 0);
 
 		const bomRawMaterials = item.materials_needed || [];
-
-		const perCaseMultiplier =
-			inventoryType === "normal"
-				? item.item === "350ml" || item.item === "500ml"
-					? 24
-					: item.item === "1L"
-					? 12
-					: 1
-				: 1;
-
-		const bomDetails = bomRawMaterials.map((rm) => {
-			const rawMat = rawInventoryData.find((i) => i.item === rm);
-			return {
-				name: rawMaterialsDisplayNames[rm] || rm,
-				supplier: rawMat?.supplier_name || "—",
-				unit: rawMat?.unit || "pcs",
-				perCaseQty: perCaseMultiplier,
-				perPieceQty: 1,
-				availableQty: rawMat ? Number(rawMat.quantity_pieces || 0) : 0,
-			};
-		});
-
-		setBOMItems(bomDetails);
-
-		// Also pre-select in the "Add Materials Needed" dropdown
-		setSelectedMaterials(bomRawMaterials);
+		setMaterialsNeeded(bomRawMaterials); // pre-fill modal with existing materials
 
 		setShowBOMModal(true);
 	};
@@ -225,44 +195,6 @@ function Inventory() {
 	const [showPriceModal, setShowPriceModal] = useState(false);
 	const [newPrice, setNewPrice] = useState(0);
 
-	// -----------------------------
-	// Display names & units
-	// -----------------------------
-	const finishedGoodsDisplayNames = {
-		"350ml": "Bottled Water (350ml)",
-		"500ml": "Bottled Water (500ml)",
-		"1L": "Bottled Water (1L)",
-		"6L": "Gallon Water (6L)",
-	};
-
-	const rawMaterialsDisplayNames = {
-		"350ml": "Plastic Bottle (350ml)",
-		"500ml": "Plastic Bottle (500ml)",
-		"1L": "Plastic Bottle (1L)",
-		"6L": "Plastic Gallon (6L)",
-		Cap: "Blue Plastic Cap",
-		"6L Cap": "Blue Plastic Cap (6L)",
-	};
-
-	const finishedGoodsUnits = {
-		"350ml": "24 pcs per case",
-		"500ml": "24 pcs per case",
-		"1L": "12 pcs per case",
-		"6L": "1 pc",
-	};
-
-	const rawMaterialsUnits = {
-		"350ml": "1 pc",
-		"500ml": "1 pc",
-		"1L": "1 pc",
-		"6L": "1 pc",
-		Cap: "1 pc",
-		"6L Cap": "1 pc",
-		Label: "20,000 pcs per roll",
-		Stretchfilm: "1 pc",
-		Shrinkfilm: "1 pc",
-	};
-
 	const finishedGoodsOrder = ["350ml", "500ml", "1L", "6L"];
 	const rawMaterialsOrder = [
 		"350ml",
@@ -276,16 +208,16 @@ function Inventory() {
 		"Shrinkfilm",
 	];
 
-	// -----------------------------
-	// Fetch inventory
-	// -----------------------------
 	const fetchInventory = async () => {
 		try {
 			setLoading(true);
 			const endpoint =
 				inventoryType === "raw"
-					? "http://localhost:8000/api/inventory_rawmats"
-					: "http://localhost:8000/api/inventories";
+					? "http://localhost:8000/api/inventory_rawmats/with-suppliers"
+					: "http://localhost:8000/api/inventories/finished-goods-with-materials";
+
+			// ? "http://localhost:8000/api/inventory_rawmats/with-suppliers"
+			// : "http://localhost:8000/api/inventories";
 
 			const res = await axios.get(endpoint);
 
@@ -302,13 +234,25 @@ function Inventory() {
 		}
 	};
 
-	// -----------------------------
-	// Fetch user info
-	// -----------------------------
-	useEffect(() => {
-		fetchInventory();
+	const fetchNotification = async () => {
+		try {
+			setLoading(true);
+			const endpoint = "http://localhost:8000/api/notifications";
 
-		const fetchUserInfo = async () => {
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		const fetchData = async () => {
+			await fetchInventory();
+
 			try {
 				const storedEmployeeID = localStorage.getItem("employeeID");
 				if (!storedEmployeeID) return;
@@ -328,43 +272,50 @@ function Inventory() {
 			} catch (error) {
 				console.error("Error fetching user data:", error);
 			}
+
+			setSearchTerm("");
+			setCurrentPage(1);
 		};
 
-		fetchUserInfo();
-		setSearchTerm("");
-		setCurrentPage(1);
+		fetchData();
 	}, [inventoryType]);
 
-	// -----------------------------
-	// Quantity color logic
-	// -----------------------------
-	const getQuantityColor = (quantity, itemName) => {
-		const foundItem = inventoryData.find((i) => i.item === itemName);
-		const alertLevel = foundItem?.low_stock_alert ?? 10;
+	useEffect(() => {
+		fetchNotification();
+	}, []);
 
-		if (quantity <= alertLevel) return "text-danger";
-		if (quantity <= alertLevel * 1.5) return "text-warning";
-		return "text-success";
-	};
+	// Assign stock_notification based on backend checkItemStock logic
+	const inventoryWithStatus = inventoryData.map((i) => {
+		const quantityInPieces =
+			inventoryType === "raw" ? i.quantity_pieces : i.quantity_pcs;
 
-	// -----------------------------
-	// Filter & sort
-	// -----------------------------
-	const filteredItems = inventoryData.filter((i) => {
-		// Search filter
+		const lowStockAlert = i.low_stock_alert ?? 0;
+		let stock_notification = "fine"; // default
+
+		if (lowStockAlert > 0) {
+			const warningThreshold = lowStockAlert * 1.5;
+
+			if (quantityInPieces <= lowStockAlert) stock_notification = "critical";
+			else if (quantityInPieces <= warningThreshold)
+				stock_notification = "warning";
+		}
+
+		return { ...i, stock_notification };
+	});
+
+	const filteredItems = inventoryWithStatus.filter((i) => {
 		const matchesSearch = i.item
 			.toLowerCase()
 			.includes(searchTerm.toLowerCase());
 
-		// Stock filter
 		let matchesStock = true;
-		const colorClass = getQuantityColor(i.quantity, i.item);
-		if (stockFilter === "normal") matchesStock = colorClass === "text-success";
+		if (stockFilter === "normal")
+			matchesStock = i.stock_notification === "fine";
 		else if (stockFilter === "warning")
-			matchesStock = colorClass === "text-warning";
-		else if (stockFilter === "low") matchesStock = colorClass === "text-danger";
+			matchesStock = i.stock_notification === "warning";
+		else if (stockFilter === "low")
+			matchesStock = i.stock_notification === "critical";
 
-		// Supplier filter
 		let matchesSupplier = true;
 		if (supplierFilter !== "All")
 			matchesSupplier = i.supplier_name === supplierFilter;
@@ -389,12 +340,11 @@ function Inventory() {
 	const currentItems = sortedItems.slice(indexOfFirstItem, indexOfLastItem);
 
 	const handleAddItem = async () => {
-		// Basic validation
 		if (
 			!newItem.item ||
 			!newItem.unit ||
 			(inventoryType === "raw" &&
-				(!newItem.quantity_pieces || Number(newItem.quantity_pieces) <= 0))
+				(!newItem.quantity_pcs || Number(newItem.quantity_pcs) <= 0))
 		) {
 			showMessage("❌ Please fill in all required fields");
 			return;
@@ -402,7 +352,7 @@ function Inventory() {
 
 		try {
 			let endpoint = "";
-			let method = "post"; // default method
+			let method = "post";
 			let payload = {};
 
 			if (inventoryType === "raw") {
@@ -416,7 +366,9 @@ function Inventory() {
 					payload = {
 						item: newItem.item,
 						unit: newItem.unit,
-						quantity_pieces: Number(newItem.quantity_pieces),
+						quantity_pieces: Number(newItem.quantity_pcs),
+						quantity: Number(newItem.quantity_pcs) / Number(newItem.conversion),
+						conversion: newItem.conversion,
 					};
 					method = "put"; // PUT for update
 				} else {
@@ -425,7 +377,9 @@ function Inventory() {
 					payload = {
 						item: newItem.item,
 						unit: newItem.unit,
-						quantity_pieces: Number(newItem.quantity_pieces),
+						quantity_pieces: Number(newItem.quantity_pcs),
+						quantity: Number(newItem.quantity_pcs) / Number(newItem.conversion),
+						conversion: newItem.conversion,
 					};
 					method = "post"; // POST for create
 				}
@@ -514,13 +468,6 @@ function Inventory() {
 			showMessage("❌ Failed to update alert quantity");
 		}
 	};
-
-	const [materialRows, setMaterialRows] = useState([
-		{ id: Date.now(), selected: "" },
-	]);
-	// -----------------------------
-	// Render
-	// -----------------------------
 
 	return (
 		<div
@@ -706,7 +653,45 @@ function Inventory() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {
@@ -729,7 +714,6 @@ function Inventory() {
 				<h2 className="topbar-title">INVENTORY</h2>
 				<hr />
 				<div className="d-flex justify-content-between align-items-center mb-3 mt-3">
-					{/* Left side: search + dropdown */}
 					<div className="d-flex gap-2">
 						<select
 							className="custom-select"
@@ -737,6 +721,7 @@ function Inventory() {
 							value={inventoryType}
 							onChange={(e) => {
 								setInventoryType(e.target.value);
+								setCurrentPage(1);
 
 								if (e.target.value != "noral") {
 									setSupplierFilter("All");
@@ -757,7 +742,23 @@ function Inventory() {
 					</button>
 				</div>
 				<hr />
-				<div style={{ display: "flex", flexDirection: "row", gap: "20px" }}>
+				<div
+					style={{
+						display: "flex",
+						flexDirection: "row",
+						gap: "20px",
+						alignItems: "center",
+					}}
+				>
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search"
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+					/>
+
 					<h2 className="topbar-title">List of Items</h2>
 					{/* Stock Filter Dropdown */}
 					<select
@@ -822,23 +823,28 @@ function Inventory() {
 						<small>Low Stock</small>
 					</div>
 				</div>
+
 				<div className="topbar-inventory-box mt-2">
 					<table className="custom-table">
 						<thead>
 							<tr>
-								<th>Items</th>
-								<th>Unit of Measurement</th>
 								{inventoryType === "normal" ? (
 									<>
-										<th>Unit Cost</th>
-										<th>Quantity (Unit)</th>
-										<th>Quantity (Pieces)</th>
+										<th>Item</th>
+										<th>Unit</th>
+										<th>Qty (Unit)</th>
+										<th>Qty (Pieces)</th>
+										<th>Price</th>
 									</>
 								) : (
 									<>
+										<th>Item</th>
 										<th>Supplier</th>
-										<th>Unit Cost</th>
-										<th>Quantity (Pieces)</th>
+										<th>Unit</th>
+										<th>Count per unit</th>
+										<th>Qty (Unit)</th>
+										<th>Qty (Pieces)</th>
+										<th>Market Price (-)</th>
 									</>
 								)}
 								<th>Action</th>
@@ -890,93 +896,101 @@ function Inventory() {
 									</tr>
 								))
 							) : currentItems.length > 0 ? (
-								currentItems.map((item) => (
-									<tr
-										key={item.id}
-										onClick={() =>
-											inventoryType === "normal" && handleShowBOM(item)
-										}
-										style={{
-											cursor:
-												inventoryType === "normal" ? "pointer" : "default",
-										}}
-									>
-										{/* 🧾 Item Name */}
-										<td>
-											{inventoryType === "raw"
-												? rawMaterialsDisplayNames[item.item] || item.item
-												: finishedGoodsDisplayNames[item.item] || item.item}
-										</td>
+								currentItems.map((item) => {
+									return (
+										<tr
+											key={`${item.id}-${item.supplier_name}`}
+											onClick={() =>
+												inventoryType === "normal" && handleShowBOM(item)
+											}
+											style={{
+												cursor:
+													inventoryType === "normal" ? "pointer" : "default",
+											}}
+										>
+											{inventoryType === "normal" ? (
+												<>
+													<td>{item.item}</td>
 
-										{/* 📏 Unit */}
-										<td>
-											{inventoryType === "raw"
-												? rawMaterialsUnits[item.item] || item.unit
-												: finishedGoodsUnits[item.item] || item.unit}
-										</td>
+													<td>{item.unit}</td>
 
-										{/* 📦 Quantities */}
-										{inventoryType === "normal" ? (
-											<>
-												<td>
-													{item.unit_cost ? formatToPeso(item.unit_cost) : "—"}
-												</td>
-												{/* Quantity (Unit) */}
-												<td
-													className={getQuantityColor(item.quantity, item.item)}
-													style={{ fontWeight: "bold" }}
+													{/* Quantity (Unit) */}
+													<td
+														className={
+															item.stock_notification === "critical"
+																? "text-danger"
+																: item.stock_notification === "warning"
+																? "text-warning"
+																: "text-success"
+														}
+														style={{ fontWeight: "bold" }}
+													>
+														{formatNumber(item.quantity)} {item.unit}
+													</td>
+
+													{/* Quantity (Pieces) */}
+													<td
+														className="text-muted"
+														style={{ fontWeight: "bold" }}
+													>
+														{formatNumber(item.quantity_pcs)} pcs
+													</td>
+													<td>
+														{item.unit_cost
+															? formatToPeso(item.unit_cost)
+															: "—"}
+													</td>
+												</>
+											) : (
+												<>
+													<td>{item.item}</td>
+
+													<td>{item.supplier_name || "—"}</td>
+
+													<td>{item.unit}</td>
+
+													<td>{formatNumber(item.conversion)} pcs/unit</td>
+
+													<td
+														className={
+															item.stock_notification === "critical"
+																? "text-danger"
+																: item.stock_notification === "warning"
+																? "text-warning"
+																: "text-success"
+														}
+													>
+														{formatNumber(item.quantity)} {item.unit}
+													</td>
+
+													<td style={{ fontWeight: "bold" }}>
+														{formatNumber(item.quantity_pieces)} pcs
+													</td>
+
+													<td>
+														{item.unit_cost
+															? `${formatToPeso(item.unit_cost)}`
+															: "—"}
+													</td>
+												</>
+											)}
+
+											{/* ⚙️ Action */}
+											<td>
+												<button
+													disabled={!item.id}
+													className="btn btn-sm btn-outline-secondary mt-1"
+													onClick={(e) => {
+														e.stopPropagation();
+														handleOpenAlertModal(item);
+													}}
 												>
-													{formatNumber(item.quantity)}
-												</td>
-
-												{/* Quantity (Pieces) */}
-												<td
-													className="text-muted"
-													style={{ fontWeight: "bold" }}
-												>
-													{Number(item.quantity_pcs || 0).toLocaleString()}
-												</td>
-											</>
-										) : (
-											<>
-												{/* 🏭 Supplier Name */}
-												<td>{item.supplier_name || "—"}</td>
-
-												{/* 💰 Unit Cost */}
-												<td>
-													{item.unit_cost
-														? `${formatToPeso(item.unit_cost)}`
-														: "—"}
-												</td>
-
-												{/* Quantity (Pieces) */}
-												<td
-													className={getQuantityColor(
-														item.quantity_pieces,
-														item.item
-													)}
-													style={{ fontWeight: "bold" }}
-												>
-													{formatNumber(item.quantity_pieces)}
-												</td>
-											</>
-										)}
-
-										{/* ⚙️ Action */}
-										<td>
-											<button
-												disabled={!item.id}
-												className="btn btn-sm btn-outline-secondary mt-1"
-												onClick={(e) => {
-													e.stopPropagation();
-													handleOpenAlertModal(item);
-												}}
-											>
-												Set Alert
-											</button>
-										</td>
-									</tr>
-								))
+													Set Alert
+												</button>
+											</td>
+										</tr>
+									);
+								})
 							) : (
 								<tr>
 									<td
@@ -1017,12 +1031,18 @@ function Inventory() {
 						>
 							<div
 								className="custom-modal bg-white rounded shadow"
-								style={{ width: "600px" }}
+								style={{
+									width: "80vw", // responsive width
+									maxWidth: "1200px",
+									maxHeight: "95vh",
+									overflowY: "auto",
+									padding: "20px",
+								}}
 								onClick={(e) => e.stopPropagation()}
 							>
 								<div className="modal-header">
 									<h5>
-										<strong>Product Details </strong>
+										<strong>Product Details</strong>
 									</h5>
 									<button
 										type="button"
@@ -1032,11 +1052,7 @@ function Inventory() {
 								</div>
 								<hr />
 								<div className="d-flex justify-content-between mt-2">
-									<strong>
-										Product:{" "}
-										{finishedGoodsDisplayNames[selectedFinishedGood?.item] ||
-											selectedFinishedGood?.item}
-									</strong>
+									<strong>Product: {selectedFinishedGood?.item}</strong>
 									<button
 										className="btn btn-sm btn-danger h-25 ms-2"
 										onClick={() => setShowDeleteConfirm(true)}
@@ -1063,7 +1079,6 @@ function Inventory() {
 								</div>
 
 								{/* Add Materials Needed */}
-
 								<div className="mt-3">
 									<h5>
 										<strong>Materials Needed: </strong>
@@ -1079,25 +1094,45 @@ function Inventory() {
 									</button>
 								</div>
 								<hr />
+
+								{/* BOM Preview Table */}
 								<table className="custom-table">
 									<thead>
 										<tr>
 											<th>Raw Material</th>
+											<th>Supplier</th>
+											<th>Per unit</th>
 											<th>Unit</th>
-											<th>Per Case</th>
-											<th>Per Piece</th>
-											{showAddMaterialsModal && <th>Action</th>}
+											<th>Remaining(pcs)</th>
+											<th>Material cost</th>
 										</tr>
 									</thead>
 									<tbody>
-										{bomItems.map((rm, idx) => (
-											<tr key={idx}>
-												<td>{rm.name}</td>
-												<td>{rm.unit}</td>
-												<td>{rm.perCaseQty.toLocaleString()}</td>
-												<td>{rm.perPieceQty.toLocaleString()}</td>
+										{materialsNeeded.length === 0 ? (
+											<tr>
+												<td colSpan={6} style={{ textAlign: "center" }}>
+													No materials added
+												</td>
 											</tr>
-										))}
+										) : (
+											materialsNeeded.map((rmName, idx) => {
+												const rawMat = rawInventoryData.find(
+													(rm) => rm.item === rmName
+												);
+												return (
+													<tr key={idx}>
+														<td>{rawMat?.item}</td>
+														<td>{rawMat?.supplier_name || "—"}</td>
+														<td>{formatNumber(rawMat?.conversion)} pcs/unit</td>
+														<td>{rawMat?.unit || "pcs"}</td>
+														<td>
+															{formatNumber(rawMat?.pcs_per_unit)} pcs remaining
+														</td>
+														<td>{formatToPeso(rawMat?.unit_cost || 0)}</td>
+													</tr>
+												);
+											})
+										)}
 									</tbody>
 								</table>
 							</div>
@@ -1108,13 +1143,30 @@ function Inventory() {
 				{showAddMaterialsModal &&
 					ReactDOM.createPortal(
 						<div
-							className="custom-modal-backdrop"
 							onClick={() => setShowAddMaterialsModal(false)}
+							style={{
+								position: "fixed",
+								inset: 0,
+								background: "rgba(0,0,0,0.5)",
+								zIndex: 9999,
+								display: "flex",
+								justifyContent: "center",
+								alignItems: "center",
+								padding: "20px",
+							}}
 						>
 							<div
-								className="custom-modal bg-white rounded shadow"
-								style={{ width: "700px" }}
 								onClick={(e) => e.stopPropagation()}
+								style={{
+									width: "80vw",
+									maxWidth: "1200px",
+									maxHeight: "95vh",
+									overflowY: "auto",
+									background: "white",
+									borderRadius: "8px",
+									boxShadow: "0 8px 30px rgba(0,0,0,0.25)",
+									padding: "20px",
+								}}
 							>
 								<div className="modal-header">
 									<h5>
@@ -1124,57 +1176,48 @@ function Inventory() {
 										type="button"
 										className="btn-close"
 										onClick={() => setShowAddMaterialsModal(false)}
-									></button>
+									/>
 								</div>
 								<hr />
 
-								{materialRows.map((row) => {
-									// Exclude already selected materials in other rows
-									const selectedValues = materialRows
-										.filter((r) => r.id !== row.id)
-										.map((r) => r.selected)
-										.filter(Boolean);
+								{/* Dropdowns to add new materials */}
+								{materialsNeeded.map((rmName, idx) => {
+									const selectedValues = materialsNeeded.filter(
+										(_, i) => i !== idx
+									);
 
-									const options = rawInventoryData
-										.filter((rm) => !selectedValues.includes(rm.item))
-										.map((rm) => ({
-											value: rm.item,
-											label: rawMaterialsDisplayNames[rm.item] || rm.item,
-											supplier: rm.supplier_name || "No Supplier",
-										}));
+									const options = rawInventoryData.filter(
+										(rm) => !selectedValues.includes(rm.item)
+									);
 
 									return (
-										<div key={row.id} className="d-flex gap-2 mb-2">
+										<div key={idx} className="d-flex gap-2 mb-2">
 											<select
 												className="form-select"
-												value={row.selected}
+												value={rmName}
 												onChange={(e) =>
-													setMaterialRows((prev) =>
-														prev.map((r) =>
-															r.id === row.id
-																? { ...r, selected: e.target.value }
-																: r
-														)
+													setMaterialsNeeded((prev) =>
+														prev.map((v, i) => (i === idx ? e.target.value : v))
 													)
 												}
 											>
 												<option value="">-- Select Material --</option>
 												{options.map((opt) => (
 													<option
-														key={`${opt.value}-${opt.supplier}`}
-														value={opt.value}
+														key={`${opt.item}-${opt.supplier_name}`}
+														value={opt.item}
 													>
-														{opt.label}
+														{opt.item} ({opt.supplier_name || "No Supplier"})
 													</option>
 												))}
 											</select>
 
-											{materialRows.length > 1 && (
+											{materialsNeeded.length > 1 && (
 												<button
 													className="btn btn-sm btn-danger"
 													onClick={() =>
-														setMaterialRows((prev) =>
-															prev.filter((r) => r.id !== row.id)
+														setMaterialsNeeded((prev) =>
+															prev.filter((_, i) => i !== idx)
 														)
 													}
 												>
@@ -1188,12 +1231,7 @@ function Inventory() {
 								<div className="d-flex gap-2 mt-2">
 									<button
 										className="btn btn-sm btn-primary"
-										onClick={() =>
-											setMaterialRows((prev) => [
-												...prev,
-												{ id: Date.now(), selected: "" },
-											])
-										}
+										onClick={() => setMaterialsNeeded((prev) => [...prev, ""])}
 									>
 										+ Add More
 									</button>
@@ -1201,11 +1239,9 @@ function Inventory() {
 									<button
 										className="btn btn-sm btn-success"
 										onClick={async () => {
-											const selectedMaterials = materialRows
-												.map((r) => r.selected)
-												.filter(Boolean);
+											// Remove empty selections
+											const selectedMaterials = materialsNeeded.filter(Boolean);
 
-											// 🛑 Basic validation
 											if (
 												!selectedFinishedGood ||
 												selectedMaterials.length === 0
@@ -1215,44 +1251,23 @@ function Inventory() {
 											}
 
 											try {
-												// 🧩 Update backend (save materials_needed)
+												// Update backend
 												await axios.put(
 													`http://localhost:8000/api/inventories/${selectedFinishedGood.id}/update-materials`,
 													{ materials_needed: selectedMaterials }
 												);
 
-												// 🧠 Update frontend BOM instantly with supplier info
-												const newBOMItems = selectedMaterials.map((rmName) => {
-													const rawMat = rawInventoryData.find(
-														(i) => i.item === rmName
-													);
-													return {
-														name: rawMaterialsDisplayNames[rmName] || rmName,
-														supplier: rawMat?.supplier_name || "—", // ✅ supplier added
-														unit: rawMat?.unit || "pcs",
-														perCaseQty: 1,
-														perPieceQty: 1,
-														availableQty: rawMat
-															? Number(rawMat.quantity_pieces || 0)
-															: 0,
-													};
-												});
-
-												// ✅ Update selected finished good’s materials
+												// Update selectedFinishedGood and BOM preview
 												setSelectedFinishedGood((prev) => ({
 													...prev,
 													materials_needed: selectedMaterials,
 												}));
 
-												// ✅ Update BOM items displayed in the table
-												setBOMItems(newBOMItems);
-
-												// ✅ UI feedback and reset
+												// Close modal & feedback
 												showMessage("✅ Materials updated successfully!");
-												setMaterialRows([{ id: Date.now(), selected: "" }]); // reset rows
-												setShowAddMaterialsModal(false); // close modal
+												setShowAddMaterialsModal(false);
 											} catch (err) {
-												console.error("Error updating materials:", err);
+												console.error(err);
 												showMessage("❌ Failed to update materials");
 											}
 										}}
@@ -1260,8 +1275,10 @@ function Inventory() {
 										Save
 									</button>
 								</div>
-								{selectedFinishedGood?.materials_needed?.length > 0 && (
-									<div className="mt-2">
+
+								{/* Preview Table */}
+								{materialsNeeded.length > 0 && (
+									<div className="mt-3">
 										<h6>
 											<strong>Current Materials Needed</strong>
 										</h6>
@@ -1270,74 +1287,46 @@ function Inventory() {
 												<tr>
 													<th>Raw Material</th>
 													<th>Supplier</th>
+													<th>Per unit</th>
 													<th>Unit</th>
-													<th>Per Case</th>
-													<th>Per Piece</th>
-													<th>Available Qty</th>
+													<th>Remaining(pcs)</th>
+													<th>Material cost</th>
 													<th>Action</th>
 												</tr>
 											</thead>
 											<tbody>
-												{selectedFinishedGood.materials_needed.map(
-													(rmName, idx) => {
-														const rawMat = rawInventoryData.find(
-															(rm) => rm.item === rmName
-														);
-														return (
-															<tr key={idx}>
-																<td>
-																	{rawMaterialsDisplayNames[rmName] || rmName}
-																</td>
-																<td>{rawMat?.supplier_name}</td>
-																<td>{rawMat?.unit || "pcs"}</td>
-																<td>{rawMat?.quantity}</td>
-																<td>{rawMat?.quantity_pieces}</td>
-																<td>
-																	{rawMat
-																		? Number(rawMat.quantity_pieces || 0)
-																		: 0}
-																</td>
-																<td>
-																	<button
-																		className="btn btn-sm btn-danger"
-																		onClick={async () => {
-																			try {
-																				const updatedMaterials =
-																					selectedFinishedGood.materials_needed.filter(
-																						(m) => m !== rmName
-																					);
-
-																				await axios.put(
-																					`http://localhost:8000/api/inventories/${selectedFinishedGood.id}/update-materials`,
-																					{ materials_needed: updatedMaterials }
-																				);
-
-																				setSelectedFinishedGood((prev) => ({
-																					...prev,
-																					materials_needed: updatedMaterials,
-																				}));
-
-																				setBOMItems((prev) =>
-																					prev.filter((_, i) => i !== idx)
-																				);
-																				showMessage(
-																					"✅ Material removed successfully!"
-																				);
-																			} catch (err) {
-																				console.error(err);
-																				showMessage(
-																					"❌ Failed to remove material"
-																				);
-																			}
-																		}}
-																	>
-																		<FaTrashAlt />
-																	</button>
-																</td>
-															</tr>
-														);
-													}
-												)}
+												{materialsNeeded.map((rmName, idx) => {
+													const rawMat = rawInventoryData.find(
+														(rm) => rm.item === rmName
+													);
+													return (
+														<tr key={idx}>
+															<td>{rawMat?.item}</td>
+															<td>{rawMat?.supplier_name}</td>
+															<td>
+																{formatNumber(rawMat?.conversion)} pcs/unit
+															</td>
+															<td>{rawMat?.unit || "pcs"}</td>
+															<td>
+																{formatNumber(rawMat?.pcs_per_unit)} pcs
+																remaining
+															</td>
+															<td>{formatToPeso(rawMat?.unit_cost || 0)}</td>
+															<td>
+																<button
+																	className="btn btn-sm btn-danger"
+																	onClick={() =>
+																		setMaterialsNeeded((prev) =>
+																			prev.filter((m) => m !== rmName)
+																		)
+																	}
+																>
+																	<FaTrashAlt />
+																</button>
+															</td>
+														</tr>
+													);
+												})}
 											</tbody>
 										</table>
 									</div>
@@ -1346,6 +1335,7 @@ function Inventory() {
 						</div>,
 						document.body
 					)}
+
 				{showDeleteConfirm &&
 					ReactDOM.createPortal(
 						<div
@@ -1363,11 +1353,7 @@ function Inventory() {
 
 								<p className="mt-2">
 									Are you sure you want to delete
-									<strong>
-										{" "}
-										{finishedGoodsDisplayNames[selectedFinishedGood?.item]}
-									</strong>
-									?
+									<strong> {selectedFinishedGood?.item}</strong>?
 								</p>
 
 								<div className="text-end mt-3">
@@ -1606,6 +1592,26 @@ function Inventory() {
 									</div>
 								)}
 
+								{inventoryType === "raw" && (
+									<div className="mb-2">
+										<label>
+											<strong>Pieces per Unit</strong>
+										</label>
+										<input
+											type="number"
+											className="form-control"
+											placeholder="Pieces per unit"
+											value={newItem.conversion || ""}
+											onChange={(e) =>
+												setNewItem({
+													...newItem,
+													conversion: e.target.value,
+												})
+											}
+										/>
+									</div>
+								)}
+
 								{/* Quantity (Pieces) */}
 								{inventoryType === "raw" && (
 									<div className="mb-2">
@@ -1616,11 +1622,11 @@ function Inventory() {
 											type="number"
 											className="form-control"
 											placeholder="Quantity (Pieces)"
-											value={newItem.quantity_pieces || ""}
+											value={newItem.quantity_pcs || ""}
 											onChange={(e) =>
 												setNewItem({
 													...newItem,
-													quantity_pieces: e.target.value,
+													quantity_pcs: e.target.value,
 												})
 											}
 										/>

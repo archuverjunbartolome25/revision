@@ -274,6 +274,7 @@ public function deduct(Request $request)
 
 
     // * NEW METHODS
+    // NOTE USED FOR FINISHED GOODS LISTING IN PRODUCTION OUTPUT
     public function getAllFinishedGoods()
     {
         try {
@@ -302,6 +303,59 @@ public function deduct(Request $request)
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+
+    // NOTE USED FOR BOM DISPLAY WITH MATERIAL DETAILS
+    public function getAllFinishedGoodsWithNeededMaterials()
+    {
+        $inventories = Inventory::all()->map(function($item) {
+            // Decode materials_needed
+            $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+            
+            // selected_materials is already an array due to casting in the model
+            $selectedMaterials = $item->selected_materials ?? [];
+            
+            $transformedMaterials = [];
+            
+            foreach ($selectedMaterials as $materialName => $supplierId) {
+                // Find the raw material by name
+                $rawMaterial = DB::table('inventory_rawmats')
+                    ->where('item', $materialName)
+                    ->first();
+                
+                if ($rawMaterial) {
+                    // Find the supplier offer for this specific raw material and supplier combination
+                    $supplierOffer = DB::table('supplier_offers')
+                        ->where('rawmat_id', $rawMaterial->id)
+                        ->where('supplier_id', $supplierId)
+                        ->first();
+                    
+                    if ($supplierOffer) {
+                        // Get supplier details
+                        $supplier = DB::table('suppliers')
+                            ->where('id', $supplierId)
+                            ->first();
+                        
+                        $transformedMaterials[] = [
+                            'raw_material_id' => $rawMaterial->id,
+                            'raw_material_name' => $rawMaterial->item,
+                            'raw_material_unit' => $supplierOffer->unit,
+                            'rawmats_pcs_per_unit' => $rawMaterial->conversion,
+                            'supplier_id' => $supplier->id,
+                            'supplier_name' => $supplier->name,
+                            'unit_price' => $supplierOffer->price,
+                        ];
+                    }
+                }
+            }
+            
+            $item->selected_materials = $transformedMaterials;
+            
+            return $item;
+        });
+    
+        return response()->json($inventories);
     }
 }
 

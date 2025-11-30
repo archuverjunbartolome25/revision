@@ -16,7 +16,9 @@ import {
 	FaListUl,
 	FaUndo,
 	FaTrashAlt,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { MdOutlineInventory2 } from "react-icons/md";
 import { BiPurchaseTag } from "react-icons/bi";
 import { useLocation } from "react-router-dom";
@@ -119,7 +121,12 @@ function PurchaseOrder() {
 	const [receivedItemsSupplierFilter, setReceivedItemsSupplierFilter] =
 		useState("All");
 
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
 	const [searchTerm, setSearchTerm] = useState("");
+	const [receivedItemsSearchTerm, setReceivedItemsSearchTerm] = useState("");
+
 	const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 	const [selectedReceipt, setSelectedReceipt] = useState(null);
 	const [receiptFile, setReceiptFile] = useState(null);
@@ -206,6 +213,20 @@ function PurchaseOrder() {
 	const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 	const currentOrders = sortedOrders.slice(indexOfFirstItem, indexOfLastItem);
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -232,6 +253,7 @@ function PurchaseOrder() {
 			}
 		};
 
+		fetchNotification();
 		fetchUserData();
 	}, []);
 
@@ -531,19 +553,6 @@ function PurchaseOrder() {
 		}
 	};
 
-	const handleItemChange = (index, materialName) => {
-		const offer = filteredItems.find((o) => o.material_name === materialName);
-
-		const updatedItems = [...orderItems];
-		updatedItems[index].item_name = materialName;
-		updatedItems[index].unit_price = offer ? parseFloat(offer.price) : 0;
-		updatedItems[index].total_price =
-			updatedItems[index].quantity * updatedItems[index].unit_price;
-
-		setOrderItems(updatedItems);
-		recalculateTotal(updatedItems);
-	};
-
 	const addItem = () => {
 		setItems((prev) => [
 			{ item_name: "", quantity: 0, unit_price: 0, total_price: 0 },
@@ -554,7 +563,7 @@ function PurchaseOrder() {
 	const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
 
 	const confirmDelete = async () => {
-		const toDelete = selectedRows; // already IDs
+		const toDelete = selectedRows;
 		try {
 			await ensureCsrf();
 			await Promise.all(
@@ -628,8 +637,18 @@ function PurchaseOrder() {
 		new Set(receivedItems.map((item) => item.supplier_name))
 	);
 
-	// Filtered items based on date and supplier
 	const filteredReceivedItems = receivedItems.filter((item) => {
+		const search = receivedItemsSearchTerm.toLowerCase();
+
+		const matchesSearch =
+			item.item_name.toLowerCase().includes(search) ||
+			item.po_number.toLowerCase().includes(search) ||
+			item.supplier_name.toLowerCase().includes(search) ||
+			String(item.quantity_received).toLowerCase().includes(search) ||
+			item.received_date.toLowerCase().includes(search); // now allowed
+
+		if (!matchesSearch) return false;
+
 		if (filterReceiveDate && item.received_date !== filterReceiveDate)
 			return false;
 
@@ -642,12 +661,6 @@ function PurchaseOrder() {
 		return true;
 	});
 
-	// const filteredReceivedItems = receivedItems.filter((item) => {
-	// 	if (filterReceiveDate && item.received_date !== filterReceiveDate)
-	// 		return false;
-	// 	return true;
-	// });
-	// Pagination for received items
 	const indexOfLastReceived = currentReceivePage * receivedItemsPerPage;
 	const indexOfFirstReceived = indexOfLastReceived - receivedItemsPerPage;
 	const currentReceivedItems = filteredReceivedItems.slice(
@@ -863,7 +876,45 @@ function PurchaseOrder() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {
@@ -1079,6 +1130,16 @@ function PurchaseOrder() {
 				{/* Received Items Section */}
 				<div className="d-flex gap-3 mt-5">
 					<h2 className="topbar-title">Received Items</h2>
+
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search received items"
+						value={receivedItemsSearchTerm}
+						onChange={(e) => setReceivedItemsSearchTerm(e.target.value)}
+					/>
+
 					<select
 						className="form-select form-select-sm"
 						style={{ width: "200px" }}
@@ -1119,7 +1180,7 @@ function PurchaseOrder() {
 								<th>Purchase Order #</th>
 								<th>Supplier</th>
 								<th>Item Name</th>
-								<th>Quantity Received</th>
+								<th>Qty Received(pcs)</th>
 								<th>Date Received</th>
 							</tr>
 						</thead>
@@ -1160,7 +1221,7 @@ function PurchaseOrder() {
 										<td>
 											{itemDisplayNames[item.item_name] || item.item_name}
 										</td>
-										<td>{formatNumber(item.quantity_received)}</td>
+										<td>{formatNumber(item.quantity_received)} pcs</td>
 										<td>
 											{item.received_date
 												? formatDate(item.received_date)

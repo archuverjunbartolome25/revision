@@ -15,7 +15,9 @@ import {
 	FaChartLine,
 	FaRegUser,
 	FaListUl,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { MdOutlineInventory2 } from "react-icons/md";
 import { BiPurchaseTag } from "react-icons/bi";
 import Skeleton from "react-loading-skeleton";
@@ -146,49 +148,10 @@ function ProductionOutput() {
 		{ product: "", unit: "", quantity: "" },
 	]);
 
-	const handleSaveProduction = async () => {
-		const validItems = productionList.filter(
-			(item) => item.product && item.unit && item.quantity
-		);
-
-		if (validItems.length === 0) {
-			alert("⚠️ Please fill out at least one complete row.");
-			return;
-		}
-
-		const conversion = { "350ml": 24, "500ml": 24, "1L": 12, "6L": 1 };
-
-		const payload = validItems.map((item) => {
-			const pcsPerCase = conversion[item.product] || 1;
-			const qty = parseInt(item.quantity);
-			const quantity_pcs = item.unit === "cases" ? qty * pcsPerCase : qty;
-
-			return {
-				product: item.product,
-				unit: item.unit,
-				quantity_pcs,
-			};
-		});
-
-		try {
-			await axios.post("http://localhost:8000/api/production-output/add", {
-				products: payload,
-			});
-			alert("✅ Production output added successfully!");
-			setShowAddModal(false);
-			setProductionList([{ product: "", unit: "", quantity: "" }]);
-		} catch (err) {
-			console.error(err);
-			alert("❌ Failed to add production output.");
-		}
-	};
 	const [loading, setLoading] = useState(true);
-	const submenuRef = useRef(null);
-	const location = useLocation();
-	const navigate = useNavigate();
-	const isReportsActive = location.pathname.startsWith("/reports");
 
-	const [reportsOpen, setReportsOpen] = useState(false);
+	const location = useLocation();
+
 	const [searchTerm, setSearchTerm] = useState("");
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [overviewOpen, setOverviewOpen] = useState(false);
@@ -201,6 +164,8 @@ function ProductionOutput() {
 	const [role, setRole] = useState("");
 	const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 	const [selectedProduction, setSelectedProduction] = useState(null);
 
 	const handleRowClick = async (record) => {
@@ -263,14 +228,7 @@ function ProductionOutput() {
 		Shrinkpack: { Label: 0.3 },
 	};
 
-	// ✅ Modal state
 	const [showAddModal, setShowAddModal] = useState(false);
-	const [newProduct, setNewProduct] = useState({
-		customer_id: "",
-		date: "",
-		delivery_date: "",
-		amount: "",
-	});
 
 	// Pagination
 	const [currentPage, setCurrentPage] = useState(1);
@@ -299,15 +257,6 @@ function ProductionOutput() {
 	});
 
 	const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
-
-	const handleDeleteItem = (index) => {
-		setAddedItems(addedItems.filter((_, i) => i !== index));
-	};
-
-	const handleSaveAll = () => {
-		console.log("Saving production output:", addedItems);
-		// Your backend call goes here
-	};
 
 	// const handleAddProduction = async (item, batchNum) => {
 	// 	try {
@@ -481,26 +430,17 @@ function ProductionOutput() {
 	const isAllSelected =
 		selectedRows.length > 0 && selectedRows.length === orders.length;
 
-	// ✅ Add Product Logic
-	const handleAddProduct = async (e) => {
-		e.preventDefault();
+	const fetchNotification = async () => {
 		try {
-			await axios.post("http://localhost:8000/api/sales-orders", {
-				...newProduct,
-				interface_type: "Production Output",
-			});
-			setShowAddModal(false);
-			setNewProduct({
-				customer_id: "",
-				date: "",
-				delivery_date: "",
-				amount: "",
-			});
-			showMessage("✅ Product added successfully!");
-			fetchOrders();
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
 		} catch (err) {
-			console.error("Error adding product:", err);
-			showMessage("❌ Failed to add product.");
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -516,6 +456,7 @@ function ProductionOutput() {
 			}
 		};
 		fetchFinishedGoods();
+		fetchNotification();
 	}, []);
 
 	const getBOMForProduction = (production) => {
@@ -775,7 +716,45 @@ function ProductionOutput() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {

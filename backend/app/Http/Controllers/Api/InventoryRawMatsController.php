@@ -101,27 +101,27 @@ public function index()
     /**
      * ➕ Add a new raw material
      */
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'item' => 'required|string',
-        'unit' => 'required|string',
-        'quantity_pieces' => 'required|integer|min:0',
-    ]);
+// public function store(Request $request)
+// {
+//     $validated = $request->validate([
+//         'item' => 'required|string',
+//         'unit' => 'required|string',
+//         'quantity_pieces' => 'required|integer|min:0',
+//     ]);
 
-    // Set required fields for your table
-    $validated['quantity'] = $validated['quantity_pieces'];  // maps to 'quantity' column
-    $validated['in_quantity'] = $validated['quantity_pieces']; 
-    $validated['out_quantity'] = 0;
-    $validated['low_stock_alert'] = $validated['low_stock_alert'] ?? 0;
+//     // Set required fields for your table
+//     $validated['quantity'] = $validated['quantity_pieces'];  // maps to 'quantity' column
+//     $validated['in_quantity'] = $validated['quantity_pieces']; 
+//     $validated['out_quantity'] = 0;
+//     $validated['low_stock_alert'] = $validated['low_stock_alert'] ?? 0;
 
-    $item = InventoryRawMat::create($validated);
+//     $item = InventoryRawMat::create($validated);
 
-    return response()->json([
-        'message' => 'Raw material added successfully',
-        'data' => $item,
-    ]);
-}
+//     return response()->json([
+//         'message' => 'Raw material added successfully',
+//         'data' => $item,
+//     ]);
+// }
 
 
     /**
@@ -217,4 +217,117 @@ public function store(Request $request)
 
         return response()->json($rawmat->supplierOffers);
     }
+
+
+
+    // * NEW ENDPOINTS
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'item' => 'required|string',
+            'unit' => 'required|string',
+            'quantity_pieces' => 'required|integer|min:0',
+            'conversion' => 'required|integer|min:1',
+        ]);
+    
+        $quantityPieces = (int) $validated['quantity_pieces']; 
+        $conversion = (int) $validated['conversion'];
+    
+        $data = [
+            'item' => $validated['item'],
+            'unit' => $validated['unit'],
+            'quantity_pieces' => $quantityPieces,       
+            'quantity' => $quantityPieces / $conversion, 
+            'conversion' => $conversion,
+            'low_stock_alert' => $request->low_stock_alert ?? 0,
+        ];
+    
+        $item = InventoryRawMat::create($data);
+    
+        return response()->json([
+            'message' => 'Raw material added successfully',
+            'data' => $item,
+        ]);
+    }
+
+
+    public function getAllWithSuppliers()
+    {
+        $rawMats = InventoryRawmat::with(['supplierOffers.supplier'])->get()
+            ->flatMap(function ($item) {
+                // If there are supplier offers, create one row per supplier
+                if ($item->supplierOffers->isNotEmpty()) {
+                    return $item->supplierOffers->map(function ($offer) use ($item) {
+                        return [
+                            'id' => $item->id,
+                            'item' => $item->item,
+                            'unit' => $item->unit,
+                            'quantity' => $item->quantity,
+                            'quantity_pieces' => $item->quantity_pieces,
+                            'conversion' => $item->conversion,
+                            'low_stock_alert' => $item->low_stock_alert,
+                            'pcs_per_unit' => $item->quantity * ($item->conversion ?? 1),
+                            'supplier_name' => optional($offer->supplier)->name ?? '—',
+                            'unit_cost' => $offer->price,
+                            'created_at' => $item->created_at,
+                            'updated_at' => $item->updated_at,
+                        ];
+                    });
+                }
+
+                // If no supplier offers, still return one row
+                return [[
+                    'id' => $item->id,
+                    'item' => $item->item,
+                    'unit' => $item->unit,
+                    'quantity' => $item->quantity,
+                    'quantity_pieces' => $item->quantity_pieces,
+                    'conversion' => $item->conversion,
+                    'low_stock_alert' => $item->low_stock_alert,
+                    'pcs_per_unit' => $item->quantity * ($item->conversion ?? 1),
+                    'supplier_name' => '—',
+                    'unit_cost' => null,
+                    'created_at' => $item->created_at,
+                    'updated_at' => $item->updated_at,
+                ]];
+            })
+            ->values();
+
+        return response()->json($rawMats);
+    }
+    // public function getAllWithSuppliers()
+    // {
+    //     $rawMats = InventoryRawmat::with(['supplierOffers.supplier'])
+    //         ->get()
+    //         ->map(function ($item) {
+
+    //             $pcsPerUnit = $item->quantity * ($item->conversion ?? 1);
+
+    //             if ($item->supplierOffers->isNotEmpty()) {
+    //                 $bestOffer = $item->supplierOffers->sortBy('price')->first();
+
+    //                 $supplierName = optional($bestOffer->supplier)->name ?? '—';
+    //                 $unitCost = $bestOffer->price ?? null;
+    //             } else {
+    //                 $supplierName = '—';
+    //                 $unitCost = null;
+    //             }
+
+    //             return [
+    //                 'id' => $item->id,
+    //                 'item' => $item->item,
+    //                 'unit' => $item->unit,
+    //                 'quantity' => $item->quantity,
+    //                 'conversion' => $item->conversion,
+    //                 'pcs_per_unit' => $pcsPerUnit,
+    //                 'supplier_name' => $supplierName,
+    //                 'unit_cost' => $unitCost,
+    //                 'created_at' => $item->created_at,
+    //                 'updated_at' => $item->updated_at
+    //             ];
+    //         })
+    //         ->values();
+
+    //     return response()->json($rawMats);
+    // }
 }

@@ -14,7 +14,9 @@ import {
 	FaChartLine,
 	FaRegUser,
 	FaListUl,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { MdOutlineInventory2 } from "react-icons/md";
 import { BiPurchaseTag } from "react-icons/bi";
 import { useLocation } from "react-router-dom";
@@ -116,6 +118,8 @@ function SalesOrder() {
 	const [role, setRole] = useState("");
 	const [employeeID, setEmployeeID] = useState("");
 	const [userFirstName, setUserFirstName] = useState("");
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 	const formatDate = (dateString) => {
 		if (!dateString) return "N/A";
 		const date = new Date(dateString);
@@ -128,19 +132,17 @@ function SalesOrder() {
 	};
 
 	const formatOrderNumber = (order) => {
-		// Add a check to ensure the 'order' object and its properties exist
-		// This prevents the "Cannot read properties of undefined" error
-		if (!order || !order.date || !order.id) {
-			return "N/A"; // Return a default value if data is missing
-		}
+		if (!order.date || !order.id) return "N/A";
 
-		// Convert the date to a string and remove hyphens
-		const datePart = order.date.toString().replace(/-/g, "");
+		const dateObj = new Date(order.date);
+		const yyyy = dateObj.getFullYear();
+		const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+		const dd = String(dateObj.getDate()).padStart(2, "0");
 
-		// Convert the ID to a string and pad it with leading zeros
+		const datePart = `${yyyy}-${mm}-${dd}`; // hyphens added
+
 		const idPart = String(order.id).padStart(4, "0");
 
-		// Return the formatted order number
 		return `SO-${datePart}-${idPart}`;
 	};
 
@@ -178,6 +180,20 @@ function SalesOrder() {
 	const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 	const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -204,6 +220,7 @@ function SalesOrder() {
 			}
 		};
 
+		fetchNotification();
 		fetchUserData();
 	}, []);
 
@@ -648,7 +665,45 @@ function SalesOrder() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {
