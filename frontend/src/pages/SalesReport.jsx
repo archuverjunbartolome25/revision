@@ -12,7 +12,10 @@ import {
 	FaTools,
 	FaUndo,
 	FaTrashAlt,
+	FaBell,
 } from "react-icons/fa"; // Add these at the top
+import NotificationDropdown from "../components/NotificationDropdown";
+
 import { useLocation } from "react-router-dom"; // 👈 add this at the top
 import SalesChart from "./SalesChart"; // 👈 import the new SalesChart
 import Skeleton from "react-loading-skeleton";
@@ -113,6 +116,9 @@ function SalesReport() {
 	const [selectedSale, setSelectedSale] = useState(null);
 	const [showModal, setShowModal] = useState(false);
 
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
 	const handleRowClick = (sale) => {
 		setSelectedSale(sale);
 		setShowModal(true);
@@ -124,16 +130,52 @@ function SalesReport() {
 	};
 
 	const [loading, setLoading] = useState(true);
-	const [currentPage, setCurrentPage] = useState(1);
-	const itemsPerPage = 8;
+	const [searchTerm, setSearchTerm] = useState("");
 	const [salesData, setSalesData] = useState([]);
 	const [logSearch, setLogSearch] = useState("");
 	const [logType, setLogType] = useState("All");
 	const [logDate, setLogDate] = useState("");
 
-	// ✅ Filter logic for Sales Order Summary (Daily, Weekly, Monthly, Yearly)
-	const filteredSalesSummary = salesData.filter((sale) => {
-		// Filter by report type/date
+	const formatOrderNumber = (order) => {
+		if (!order.date || !order.id) return "N/A";
+
+		const dateObj = new Date(order.date);
+		const yyyy = dateObj.getFullYear();
+		const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+		const dd = String(dateObj.getDate()).padStart(2, "0");
+
+		const datePart = `${yyyy}-${mm}-${dd}`; // hyphens added
+
+		const idPart = String(order.id).padStart(4, "0");
+
+		return `SO-${datePart}-${idPart}`;
+	};
+
+	const salesWithSONumber = salesData.map((sale) => ({
+		...sale,
+		so_number: formatOrderNumber(sale),
+	}));
+
+	const filteredSalesSummary = salesWithSONumber.filter((sale) => {
+		const term = searchTerm.toLowerCase();
+
+		// 🔍 SEARCH FILTER
+		if (searchTerm.trim() !== "") {
+			const matchesSearch =
+				sale.so_number?.toLowerCase().includes(term) ||
+				sale.customer_name?.toLowerCase().includes(term) ||
+				sale.products?.toLowerCase().includes(term) ||
+				sale.location?.toLowerCase().includes(term) ||
+				sale.order_type?.toLowerCase().includes(term) ||
+				String(sale.cogs)?.toLowerCase().includes(term) ||
+				sale.date?.toLowerCase().includes(term) ||
+				sale.delivery_date?.toLowerCase().includes(term) ||
+				sale.date_delivered?.toLowerCase().includes(term);
+
+			if (!matchesSearch) return false;
+		}
+
+		// 📆 DATE FILTERS
 		if (filterValue) {
 			const saleDate = new Date(sale.date);
 			const filter = new Date(filterValue);
@@ -151,6 +193,7 @@ function SalesReport() {
 							7
 					)
 				).padStart(2, "0")}`;
+
 				if (saleWeek !== filterValue) return false;
 			}
 
@@ -158,6 +201,7 @@ function SalesReport() {
 				const saleMonth = `${saleDate.getFullYear()}-${String(
 					saleDate.getMonth() + 1
 				).padStart(2, "0")}`;
+
 				if (saleMonth !== filterValue) return false;
 			}
 
@@ -166,10 +210,11 @@ function SalesReport() {
 			}
 		}
 
-		// ✅ Filter by Status
+		// 🚚 STATUS FILTER
 		if (statusFilter !== "All") {
 			const saleStatus =
 				sale.status || (sale.date_delivered ? "Delivered" : "Pending");
+
 			if (saleStatus !== statusFilter) return false;
 		}
 
@@ -274,6 +319,20 @@ function SalesReport() {
 
 	const isReportsActive = location.pathname.startsWith("/reports");
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchSalesData = async () => {
 			try {
@@ -287,6 +346,7 @@ function SalesReport() {
 			}
 		};
 
+		fetchNotification();
 		fetchSalesData();
 	}, []);
 
@@ -582,7 +642,45 @@ function SalesReport() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {
@@ -634,6 +732,14 @@ function SalesReport() {
 				<hr />
 				<div className="d-flex gap-3">
 					<div className="d-flex align-items-center gap-2 mb-2">
+						<input
+							type="text"
+							className="form-control"
+							style={{ width: "250px" }}
+							placeholder="Search"
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+						/>
 						<label className="fw-bold me-2">Report Type:</label>
 						<select
 							className="custom-select"
@@ -776,13 +882,6 @@ function SalesReport() {
 									filteredSalesSummary
 										.slice(salesIndexOfFirstItem, salesIndexOfLastItem)
 										.map((order, index) => {
-											const formatOrderNumber = (order) => {
-												if (!order.date || !order.id) return "N/A";
-												const datePart = order.date.replace(/-/g, "");
-												const idPart = String(order.id).padStart(4, "0");
-												return `SO-${datePart}-${idPart}`;
-											};
-
 											let quantities = {};
 											try {
 												quantities =
@@ -800,7 +899,7 @@ function SalesReport() {
 
 											return (
 												<tr key={index}>
-													<td>{formatOrderNumber(order)}</td>
+													<td>{order.so_number}</td>
 													<td>{order.customer_name || "N/A"}</td>
 													<td>{order.location || "N/A"}</td>
 													<td>

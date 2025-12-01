@@ -24,6 +24,7 @@ use App\Http\Controllers\DisposalController;
 use App\Http\Controllers\DisposalProductController;
 use App\Http\Controllers\DisposalRawMatController;
 use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\InventoryNotificationController;
 
 // ============================
 // AUTHENTICATION ROUTES
@@ -76,7 +77,7 @@ Route::prefix('inventories')->group(function () {
     Route::put('{id}/update-alert', [InventoryController::class, 'updateAlert']);
     Route::put('{id}/update-price', [InventoryController::class, 'updatePrice']);
     Route::get('finished-goods', [InventoryController::class, 'finishedGoods']);
-
+    Route::get('finished-goods-with-materials', [InventoryController::class, 'getAllFinishedGoodsWithNeededMaterials']);
 });
 
 Route::prefix('inventory_rawmats')->group(function () {
@@ -88,6 +89,7 @@ Route::prefix('inventory_rawmats')->group(function () {
     Route::post('receive', [InventoryRawMatsController::class, 'receiveItem']);
     Route::put('{id}/update-alert', [InventoryRawMatsController::class, 'updateAlert']);
     Route::get('{id}/suppliers', [InventoryRawMatsController::class, 'getSuppliers']);
+    Route::get('/with-suppliers', [InventoryRawMatsController::class, 'getAllWithSuppliers']);
 });
 
 // ============================
@@ -249,6 +251,20 @@ Route::post('inventories/restore/{id}', [InventoryController::class, 'restore'])
 
 // *  NEW ENDPOINTS
 Route::get('/finished-goods', [InventoryController::class, 'getAllFinishedGoods']);
+
+
+// * NOTIFICATION ROUTES
+Route::prefix('notifications')->name('notifications.')->group(function () {
+    Route::get('/', [InventoryNotificationController::class, 'index'])->name('index');
+    Route::get('/recent', [InventoryNotificationController::class, 'getRecent'])->name('recent');
+    Route::get('/stats', [InventoryNotificationController::class, 'getStats'])->name('stats');
+    Route::get('/count', [InventoryNotificationController::class, 'getUnreadCount'])->name('count');
+    Route::get('/{id}', [InventoryNotificationController::class, 'show'])->name('show');
+    Route::post('/{id}/read', [InventoryNotificationController::class, 'markAsRead'])->name('read');
+    Route::post('/read-all', [InventoryNotificationController::class, 'markAllAsRead'])->name('readAll');
+    Route::post('/check-stock', [InventoryNotificationController::class, 'checkStock'])->name('checkStock');
+    Route::delete('/{id}', [InventoryNotificationController::class, 'destroy'])->name('destroy');
+});
 
 
 // Route::post('/upload', [PurchaseOrderController::class, 'upload']);

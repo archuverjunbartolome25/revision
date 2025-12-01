@@ -17,7 +17,9 @@ import {
 	FaChartLine,
 	FaRegUser,
 	FaListUl,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import {
 	Chart as ChartJS,
 	ArcElement,
@@ -118,6 +120,8 @@ function Dashboard() {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [reportsOpen, setReportsOpen] = useState(false);
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
 	// User info
 	const [userFirstName, setUserFirstName] = useState("");
@@ -217,9 +221,10 @@ function Dashboard() {
 			}
 
 			// Top products
-			const topProductsRes = await axios.get(
-				"http://localhost:8000/api/sales-orders/top-products"
-			);
+			// TODO BRING ME BACK
+			// const topProductsRes = await axios.get(
+			// 	"http://localhost:8000/api/sales-orders/top-products"
+			// );
 			setTopProducts(topProductsRes.data || []);
 
 			// Total sales orders
@@ -241,6 +246,22 @@ function Dashboard() {
 		}
 	};
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			console.log(res.data);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	// Fetch dashboard data on mount & when forecast period changes
 	useEffect(() => {
 		fetchDashboardData();
@@ -248,6 +269,7 @@ function Dashboard() {
 
 	// Set current month
 	useEffect(() => {
+		fetchNotification();
 		const now = new Date();
 		setCurrentMonth(
 			now.toLocaleString("default", { month: "long" }).toUpperCase()
@@ -562,7 +584,45 @@ function Dashboard() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {

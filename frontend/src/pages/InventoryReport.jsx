@@ -12,7 +12,9 @@ import {
 	FaListUl,
 	FaUndo,
 	FaTrashAlt,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { TbReportSearch } from "react-icons/tb";
 import { MdOutlineDashboard, MdOutlineInventory2 } from "react-icons/md";
 import { BiPurchaseTag } from "react-icons/bi";
@@ -150,7 +152,24 @@ function InventoryReport() {
 	const [rawMats, setRawMats] = useState([]);
 	const [supplierFilter, setSupplierFilter] = useState("All");
 
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
 	const isReportsActive = location.pathname.startsWith("/reports");
+
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	// ✅ Fetch inventory data
 	useEffect(() => {
@@ -177,6 +196,7 @@ function InventoryReport() {
 			}
 		};
 
+		fetchNotification();
 		fetchInventoryData();
 	}, []);
 
@@ -543,7 +563,45 @@ function InventoryReport() {
 						</div>
 					</div>
 
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							onChange={(e) => {
@@ -583,6 +641,14 @@ function InventoryReport() {
 				<hr />
 
 				<div className="d-flex align-items-center gap-2 mb-2">
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search"
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+					/>
 					<label className="fw-bold me-2">Filter by:</label>
 					<select
 						className="custom-select"

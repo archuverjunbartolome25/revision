@@ -11,7 +11,9 @@ import {
 	FaTrashAlt,
 	FaRegUser,
 	FaListUl,
+	FaBell,
 } from "react-icons/fa";
+import NotificationDropdown from "../components/NotificationDropdown";
 import { BiPurchaseTag } from "react-icons/bi";
 import { useAuth } from "../hooks/useAuth";
 import Skeleton from "react-loading-skeleton";
@@ -92,6 +94,9 @@ function Disposal() {
 	const [showAddModal, setShowAddModal] = useState(false);
 	const [statusFilter, setStatusFilter] = useState("");
 	const [dateFilter, setDateFilter] = useState("");
+
+	const [stockNotifications, setStockNotifications] = useState([]);
+	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
 	const storedRole = localStorage.getItem("role");
 	const canAccess = (module) => roles[module]?.includes(storedRole);
@@ -246,6 +251,20 @@ function Disposal() {
 		setCurrentPage(1);
 	}, [newDisposal.selectedType, searchTerm]);
 
+	const fetchNotification = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/notifications";
+
+			const res = await axios.get(endpoint);
+
+			setStockNotifications(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	useEffect(() => {
 		const fetchUserData = async () => {
 			try {
@@ -267,6 +286,8 @@ function Disposal() {
 				console.error("Error fetching user data:", error);
 			}
 		};
+
+		fetchNotification();
 		fetchUserData();
 	}, []);
 
@@ -586,7 +607,45 @@ function Disposal() {
 							</div>
 						</div>
 					</div>
-					<div className="topbar-right">
+					<div className="topbar-right gap-4">
+						<div>
+							<div style={{ position: "relative", display: "inline-block" }}>
+								<FaBell
+									size={24}
+									style={{ cursor: "pointer", color: "white" }}
+									onClick={() => setShowNotifDropdown(true)}
+									disabled={
+										stockNotifications.notifications &&
+										stockNotifications.notifications.length > 0
+									}
+								/>
+								{stockNotifications?.notifications?.some((n) => !n.is_read) && (
+									<span
+										style={{
+											position: "absolute",
+											top: 0,
+											right: 0,
+											width: "8px",
+											height: "8px",
+											borderRadius: "50%",
+											background: "red",
+											border: "1px solid white",
+										}}
+									></span>
+								)}
+							</div>
+
+							{stockNotifications.notifications &&
+								stockNotifications.notifications.length > 0 &&
+								showNotifDropdown && (
+									<NotificationDropdown
+										notificationsData={stockNotifications}
+										show={showNotifDropdown}
+										onClose={() => setShowNotifDropdown(false)}
+										refetch={fetchNotification}
+									/>
+								)}
+						</div>
 						<select
 							className="profile-select"
 							defaultValue=""

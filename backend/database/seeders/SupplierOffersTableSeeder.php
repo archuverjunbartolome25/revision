@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class SupplierOffersTableSeeder extends Seeder
 {
@@ -19,8 +20,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 1, // Plastic Bottle (350ml)
                 'unit' => 'pieces',
                 'price' => 2.10,
-                'created_at' => '2025-11-02 23:31:20',
-                'updated_at' => '2025-11-02 23:31:20',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 2,
@@ -28,8 +29,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 2, // Plastic Bottle (500ml)
                 'unit' => 'pieces',
                 'price' => 2.25,
-                'created_at' => '2025-11-02 23:44:37',
-                'updated_at' => '2025-11-02 23:44:37',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 4,
@@ -37,8 +38,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 4, // Plastic Bottle (1L)
                 'unit' => 'pieces',
                 'price' => 4.05,
-                'created_at' => '2025-11-02 23:48:11',
-                'updated_at' => '2025-11-02 23:48:11',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 5,
@@ -46,8 +47,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 5, // Plastic Gallon (6L)
                 'unit' => 'pieces',
                 'price' => 23.00,
-                'created_at' => '2025-11-02 23:48:36',
-                'updated_at' => '2025-11-02 23:48:36',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 6,
@@ -55,8 +56,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 6, // Blue Plastic Cap
                 'unit' => 'pieces',
                 'price' => 0.50,
-                'created_at' => '2025-11-02 23:48:57',
-                'updated_at' => '2025-11-02 23:48:57',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 8,
@@ -64,8 +65,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 8, // Blue Plastic Cap (6L)
                 'unit' => 'pieces',
                 'price' => 3.00,
-                'created_at' => '2025-11-02 23:49:34',
-                'updated_at' => '2025-11-02 23:49:34',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             
             // Filpet, Inc. offers (alternative supplier for same materials)
@@ -75,8 +76,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 3, // Plastic Bottle (500ml) - different rawmat_id
                 'unit' => 'pieces',
                 'price' => 2.35,
-                'created_at' => '2025-11-02 23:47:39',
-                'updated_at' => '2025-11-02 23:47:39',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             [
                 'id' => 7,
@@ -84,8 +85,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 7, // Blue Plastic Cap - different rawmat_id
                 'unit' => 'pieces',
                 'price' => 0.49,
-                'created_at' => '2025-11-02 23:49:14',
-                'updated_at' => '2025-11-02 23:49:14',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             
             // Royalseal offers
@@ -95,8 +96,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 9, // Label
                 'unit' => 'rolls',
                 'price' => 7960.00,
-                'created_at' => '2025-11-02 23:50:02',
-                'updated_at' => '2025-11-02 23:50:02',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             
             // Shrinkpack offers (alternative label supplier)
@@ -106,8 +107,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 10, // Label - different rawmat_id
                 'unit' => 'rolls',
                 'price' => 5960.00,
-                'created_at' => '2025-11-02 23:50:16',
-                'updated_at' => '2025-11-02 23:50:16',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             
             // Synergy offers
@@ -117,8 +118,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 11, // Stretchfilm
                 'unit' => 'pieces',
                 'price' => 320.00,
-                'created_at' => '2025-11-02 23:50:30',
-                'updated_at' => '2025-11-02 23:50:30',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
             
             // Polyflex offers
@@ -128,8 +129,8 @@ class SupplierOffersTableSeeder extends Seeder
                 'rawmat_id' => 12, // Shrinkfilm
                 'unit' => 'pieces',
                 'price' => 2337.00,
-                'created_at' => '2025-11-02 23:50:45',
-                'updated_at' => '2025-11-02 23:50:45',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
             ],
         ]);
     }
