@@ -413,7 +413,7 @@ function PurchaseOrderReport() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}
@@ -855,7 +855,9 @@ function PurchaseOrderReport() {
 									<th>Time Processed</th>
 									<th>Type</th>
 									<th>Item Name</th>
-									<th>Quantity</th>
+									<th>Previous Quantity (pcs)</th>
+									<th>Quantity (pcs)</th>
+									<th>Total Quantity (pcs)</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -899,10 +901,12 @@ function PurchaseOrderReport() {
 														? itemDisplayNames[log.item_name] || log.item_name
 														: log.item_name}
 												</td>
+												<td>{formatNumber(log.previous_quantity)}</td>
 												<td style={{ color, fontWeight: "bold" }}>
 													{sign}
 													{formatNumber(log.quantity)}
 												</td>
+												<td>{formatNumber(log.remaining_quantity)}</td>
 											</tr>
 										);
 									})

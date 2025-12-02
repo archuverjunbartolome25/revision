@@ -29,27 +29,19 @@ class InventoryActivityLogController extends Controller
 
         $enhancedLogs = $logs->map(function ($log) {
 
-            // Get current remaining quantity in pieces
             if ($log->type === 'Finished Goods') {
                 $inventory = Inventory::where('item', $log->item_name)->first();
-                $currentQty = $inventory ? $inventory->quantity_pcs : 0;
+                $unit = $inventory ? $inventory->unit : 'pieces';
+                $pcsPerUnit = $inventory ? $inventory->pcs_per_unit : 1;
             } else {
                 $inventory = InventoryRawMat::where('item', $log->item_name)->first();
-                $currentQty = $inventory ? $inventory->quantity_pieces : 0;
+                $unit = 'pieces';
+                $pcsPerUnit = 1; 
             }
 
-            // Log quantity in pieces
-            $logQty = $log->quantity_pcs ?? $log->quantity;
 
-            // Previous quantity = what inventory had before this process
-            $previous = $currentQty - $logQty;
-
-            // Remaining quantity = current inventory
-            $remaining = $currentQty;
-
-            $log->previous_quantity = $previous;
-            $log->quantity = $logQty;
-            $log->remaining_quantity = $remaining;
+            $log->pcs_per_unit = $pcsPerUnit;
+            $log->unit = $unit;
 
             return $log;
         });

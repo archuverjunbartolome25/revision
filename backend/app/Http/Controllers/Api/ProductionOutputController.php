@@ -143,24 +143,27 @@ class ProductionOutputController extends Controller
                 ]);
     
                 if ($finishedGood) {
+                    $previousQuantity = $finishedGood->quantity_pcs;
                     $finishedGood->quantity_pcs += $quantityPcs;
-                    
                     $finishedGood->quantity = floor($finishedGood->quantity_pcs / $pcsPerUnit);
-                    
                     $finishedGood->save();
-                    
+                
+                    $remainingQuantity = $finishedGood->quantity_pcs; 
+                
                     $affectedFinishedGoods[] = $finishedGood->id;
+                
+                    // Log finished goods
+                    \App\Models\InventoryActivityLog::create([
+                        'employee_id' => $employeeId,
+                        'module' => 'Production Output',
+                        'type' => 'Finished Goods',
+                        'item_name' => $productName,
+                        'quantity' => $quantityPcs,
+                        'previous_quantity' => $previousQuantity,
+                        'remaining_quantity'=> $remainingQuantity,
+                        'processed_at' => now(),
+                    ]);
                 }
-    
-                // Log finished goods
-                \App\Models\InventoryActivityLog::create([
-                    'employee_id' => $employeeId,
-                    'module' => 'Production Output',
-                    'type' => 'Finished Goods',
-                    'item_name' => $productName,
-                    'quantity' => $quantityPcs,
-                    'processed_at' => now(),
-                ]);
     
                 foreach ($keyedMaterials as $rawItem => $usedQtyPcs) {
                     $supplierId = $selectedSuppliers[$rawItem] ?? null;
@@ -205,15 +208,18 @@ class ProductionOutputController extends Controller
     
                         foreach ($inventories as $stock) {
                             if ($remaining <= 0) break;
-                            
+                        
                             $deductPcs = min($remaining, $stock->quantity_pieces);
-                            
                             $conversion = $stock->conversion ?? 1;
-                            
+                        
+                            // Compute previous quantity before deduction
+                            $previousQuantity = $stock->quantity_pieces;
+                        
+                            // Compute new quantities
                             $newQuantityPieces = max(0, $stock->quantity_pieces - $deductPcs);
-                            
                             $newQuantity = floor($newQuantityPieces / $conversion);
-    
+                        
+                            // Update the inventory
                             DB::table('inventory_rawmats')
                                 ->where('id', $stock->id)
                                 ->update([
@@ -221,20 +227,25 @@ class ProductionOutputController extends Controller
                                     'quantity' => $newQuantity,
                                     'updated_at' => now(),
                                 ]);
-                            
+                        
+                            // Track affected inventory items
                             if (!in_array($stock->id, $affectedRawMaterials)) {
                                 $affectedRawMaterials[] = $stock->id;
                             }
-    
+                        
+                            // Log activity with previous and remaining quantities
                             \App\Models\InventoryActivityLog::create([
                                 'employee_id' => $employeeId,
                                 'module' => 'Production Output',
                                 'type' => 'Raw Materials',
                                 'item_name' => $rawItem,
                                 'quantity' => $deductPcs,
+                                'previous_quantity' => $previousQuantity,
+                                'remaining_quantity' => $newQuantityPieces,
                                 'processed_at' => now(),
                             ]);
-    
+                        
+                            // Reduce remaining quantity to deduct
                             $remaining -= $deductPcs;
                         }
                     } else {
@@ -255,15 +266,18 @@ class ProductionOutputController extends Controller
     
                         foreach ($inventories as $stock) {
                             if ($remaining <= 0) break;
-                            
+                        
                             $deductPcs = min($remaining, $stock->quantity_pieces);
-                            
                             $conversion = $stock->conversion ?? 1;
-                            
+                        
+                            // Compute previous quantity before deduction
+                            $previousQuantity = $stock->quantity_pieces;
+                        
+                            // Compute new quantities
                             $newQuantityPieces = max(0, $stock->quantity_pieces - $deductPcs);
-                            
                             $newQuantity = floor($newQuantityPieces / $conversion);
-    
+                        
+                            // Update the inventory
                             DB::table('inventory_rawmats')
                                 ->where('id', $stock->id)
                                 ->update([
@@ -271,22 +285,28 @@ class ProductionOutputController extends Controller
                                     'quantity' => $newQuantity,
                                     'updated_at' => now(),
                                 ]);
-                            
+                        
+                            // Track affected inventory items
                             if (!in_array($stock->id, $affectedRawMaterials)) {
                                 $affectedRawMaterials[] = $stock->id;
                             }
-    
+                        
+                            // Log activity including previous and remaining quantities
                             \App\Models\InventoryActivityLog::create([
                                 'employee_id' => $employeeId,
                                 'module' => 'Production Output',
                                 'type' => 'Raw Materials',
                                 'item_name' => $rawItem,
                                 'quantity' => $deductPcs,
+                                'previous_quantity' => $previousQuantity,
+                                'remaining_quantity' => $newQuantityPieces,
                                 'processed_at' => now(),
                             ]);
-    
+                        
+                            // Decrease remaining quantity to deduct
                             $remaining -= $deductPcs;
                         }
+                        
                     }
     
                     $debugInfo['deduction'][$rawItem]['remaining_after'] = $remaining;

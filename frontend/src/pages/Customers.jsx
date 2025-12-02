@@ -100,7 +100,7 @@ function Customers() {
 		billing_address: "",
 		shipping_address: "",
 		bank_details: "",
-		tin: "",
+		// tin: "",
 		status: "Active", // <-- New status field
 	});
 	const [successMessage, setSuccessMessage] = useState("");
@@ -224,7 +224,7 @@ function Customers() {
 				billing_address: "",
 				shipping_address: "",
 				bank_details: "",
-				tin: "",
+				// tin: "",
 			});
 
 			// Close the modal
@@ -753,7 +753,7 @@ function Customers() {
 								}
 							/>
 						</div>
-
+						{/* 
 						<div className="mb-1">
 							<label className="form-label">
 								<strong>TIN:</strong>
@@ -767,7 +767,7 @@ function Customers() {
 									setNewCustomer({ ...newCustomer, tin: e.target.value })
 								}
 							/>
-						</div>
+						</div> */}
 
 						<div className="mb-1">
 							<label className="form-label">
@@ -823,9 +823,9 @@ function Customers() {
 							<strong>Shipping Address:</strong>{" "}
 							{selectedCustomer.shipping_address}
 						</p>
-						<p>
+						{/* <p>
 							<strong>TIN:</strong> {selectedCustomer.tin || "N/A"}
-						</p>
+						</p> */}
 						<p>
 							<strong>Bank Details:</strong>{" "}
 							{selectedCustomer.bank_details || "N/A"}
@@ -906,7 +906,7 @@ function Customers() {
 							/>
 						</div>
 
-						<div className="mb-1">
+						{/* <div className="mb-1">
 							<label className="form-label">TIN:</label>
 							<input
 								type="text"
@@ -919,7 +919,7 @@ function Customers() {
 									})
 								}
 							/>
-						</div>
+						</div> */}
 
 						<div className="mb-1">
 							<label className="form-label">Status:</label>

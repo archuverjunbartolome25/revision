@@ -353,7 +353,7 @@ function ReturnToVendorReport() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}

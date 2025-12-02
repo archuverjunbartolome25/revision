@@ -423,8 +423,6 @@ function SalesOrder() {
 	const handleGeneratePdf = async () => {
 		if (selectedOrderIndex === null) return;
 
-		const orderId = orders[selectedOrderIndex].id;
-
 		try {
 			const response = await axios.get(
 				`http://localhost:8000/api/sales-orders/${orderId}/pdf`,
@@ -560,7 +558,7 @@ function SalesOrder() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}

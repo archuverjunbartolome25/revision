@@ -15,7 +15,6 @@ class Customer extends Model
         'billing_address',
         'shipping_address',
         'bank_details',
-        'tin',  
         'status', 
     ];
 }

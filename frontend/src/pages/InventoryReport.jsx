@@ -459,7 +459,7 @@ function InventoryReport() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}
@@ -909,9 +909,9 @@ function InventoryReport() {
 									<th>Time Processed</th>
 									<th>Type</th>
 									<th>Item Name</th>
-									<th>Previous Quantity</th>
-									<th>Quantity</th>
-									<th>Remaining Quantity</th>
+									<th>Previous Quantity (pcs)</th>
+									<th>Quantity (pcs)</th>
+									<th>Total Quantity (pcs)</th>
 								</tr>
 							</thead>
 							<tbody>
