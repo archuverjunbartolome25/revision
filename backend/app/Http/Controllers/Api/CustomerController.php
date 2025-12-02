@@ -20,7 +20,6 @@ class CustomerController extends Controller
             'billing_address',
             'shipping_address',
             'bank_details',
-            'tin',
             'status' 
         )->get();
     }
@@ -35,7 +34,6 @@ class CustomerController extends Controller
             'billing_address' => 'nullable|string|max:255',
             'shipping_address' => 'nullable|string|max:255',
             'bank_details' => 'nullable|string|max:255',
-            'tin' => 'nullable|string|max:255',
             'status' => 'required|in:Active,Inactive', 
         ]);
 
@@ -56,7 +54,6 @@ class CustomerController extends Controller
             'billing_address' => 'nullable|string|max:255',
             'shipping_address' => 'nullable|string|max:255',
             'bank_details' => 'nullable|string|max:255',
-            'tin' => 'nullable|string|max:255',
             'status' => 'required|in:Active,Inactive', // Added status
         ]);
 

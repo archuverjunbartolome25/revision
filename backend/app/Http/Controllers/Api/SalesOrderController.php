@@ -8,7 +8,8 @@ use App\Models\SalesOrder;
 use App\Models\Inventory;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class SalesOrderController extends Controller
 {
@@ -120,33 +121,41 @@ class SalesOrderController extends Controller
             // 🔹 Deduct inventory & log activity
             foreach ($quantities as $product => $casesOrdered) {
                 if ($casesOrdered <= 0) continue;
-
+            
                 $inventory = DB::table('inventories')->where('item', $product)->first();
                 if (!$inventory) continue;
-
+            
                 $pcsPerUnit = $inventory->pcs_per_unit ?? 1;
                 $pcsOrdered = $casesOrdered * $pcsPerUnit;
-
+            
+                // Compute previous quantities before deduction
+                $previousQuantity = $inventory->quantity_pcs;
+                $newQuantityPcs = max(0, $inventory->quantity_pcs - $pcsOrdered);
+                $newQuantity = max(0, $inventory->quantity - $casesOrdered);
+            
                 DB::table('inventories')->where('id', $inventory->id)->update([
-                    'quantity'     => max(0, $inventory->quantity - $casesOrdered),
-                    'quantity_pcs' => max(0, $inventory->quantity_pcs - $pcsOrdered),
+                    'quantity'     => $newQuantity,
+                    'quantity_pcs' => $newQuantityPcs,
                     'updated_at'   => now(),
                 ]);
                 
                 // Track for notification check
                 $affectedInventoryIds[] = $inventory->id;
-
-                // Log inventory deduction
+            
+                // Log inventory deduction with previous and remaining quantities
                 \App\Models\InventoryActivityLog::create([
-                    'employee_id'  => $employeeId,
-                    'module'       => 'Sales Order',
-                    'type'         => 'Finished Goods',
-                    'item_name'    => $product,
-                    'quantity'     => $pcsOrdered,
-                    'processed_at' => now(),
+                    'employee_id'       => $employeeId,
+                    'module'            => 'Sales Order',
+                    'type'              => 'Finished Goods',
+                    'item_name'         => $product,
+                    'quantity'          => $pcsOrdered,
+                    'previous_quantity' => $previousQuantity,
+                    'remaining_quantity'=> $newQuantityPcs,
+                    'processed_at'      => now(),
                 ]);
             }
 
+            
             DB::commit();
             $this->checkAndUpdateNotifications($affectedInventoryIds, []);
 
@@ -406,20 +415,59 @@ public function markDelivered(Request $request, $id)
     // ----- PDF Generation -----
     public function generatePdf($id)
     {
+        // Fetch order with customer
         $order = SalesOrder::with('customer')->findOrFail($id);
-
-        $datePart = str_replace('-', '', $order->date);
+    
+        // Safe decode products
+        $products = is_string($order->products) ? json_decode($order->products, true) : $order->products;
+        if (isset($products['products'])) {
+            $products = $products['products'];
+        }
+        $products = $products ?? [];
+    
+        // Safe quantities
+        $quantities = $order->quantities ?? [];
+    
+        Log::info('Products (decoded):', ['products' => $products]);
+        Log::info('Quantities:', ['quantities' => $quantities]);
+        Log::info('Order object:', ['order' => $order]);
+    
+        // Fetch unit prices from Inventory
+        $inventories = Inventory::whereIn('item', $products)->pluck('unit_cost', 'item')->toArray();
+    
+        // Build items array
+        $items = [];
+        foreach ($products as $product) {
+            $qty = $quantities[$product] ?? 0;
+            $unitPrice = $inventories[$product] ?? 0;
+            $total = $qty * $unitPrice;
+    
+            $items[] = [
+                'product' => $product,
+                'quantity' => $qty,
+                'unit_price' => $unitPrice,
+                'total_price' => $total,
+            ];
+        }
+    
+        Log::info('Prepared items:', ['items' => $items]);
+    
+        // Generate order number
+        $datePart = Carbon::parse($order->date)->format('Y-m-d');
         $idPart = str_pad($order->id, 4, '0', STR_PAD_LEFT);
         $orderNumber = "SO-{$datePart}-{$idPart}";
-
-        $pdf = PDF::loadView('pdfs.sales_order', [
+    
+        // Generate PDF
+        $pdf = Pdf::loadView('pdfs.sales_order', [
             'order' => $order,
             'customer' => $order->customer,
-            'orderNumber' => $orderNumber
+            'orderNumber' => $orderNumber,
+            'items' => $items
         ]);
-
+    
         return $pdf->download('sales-order-' . $order->id . '.pdf');
     }
+
 public function mostSelling()
 {
     try {

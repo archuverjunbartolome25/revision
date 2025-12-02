@@ -142,52 +142,66 @@ class PurchaseOrderController extends Controller
             if ($rawMat) {
                 $conversion = $rawMat->conversion ?? 1;
                 $receivedPcs = $qty * $conversion;
-    
+            
+                // Compute previous quantity before addition
+                $previousQuantity = $rawMat->quantity_pieces;
+            
                 // Add to quantity_pieces
                 $rawMat->quantity_pieces += $receivedPcs;
-                
+            
                 // Recalculate quantity based on conversion
                 $rawMat->quantity = floor($rawMat->quantity_pieces / $conversion);
-                
+            
+                // Save inventory
                 $rawMat->save();
-                
+            
                 // Track for notification check
                 $affectedRawMatIds[] = $rawMat->id;
-    
+            
+                // Log activity with previous and remaining quantities
                 \App\Models\InventoryActivityLog::create([
                     'employee_id' => $employeeId,
-                    'module'      => 'Purchase Order',
-                    'type'        => 'Raw Materials',
-                    'item_name'   => $item->item_name,
-                    'quantity'    => $receivedPcs,
-                    'processed_at'=> now(),
+                    'module' => 'Purchase Order',
+                    'type' => 'Raw Materials',
+                    'item_name' => $item->item_name,
+                    'quantity' => $receivedPcs,
+                    'previous_quantity' => $previousQuantity,
+                    'remaining_quantity' => $rawMat->quantity_pieces,
+                    'processed_at' => now(),
                 ]);
             } else {
                 $finished = Inventory::firstOrCreate(
                     ['item' => $item->item_name],
                     ['unit' => 'pcs', 'quantity' => 0, 'quantity_pcs' => 0, 'low_stock_alert' => 0, 'pcs_per_unit' => 1]
                 );
-    
+            
                 $pcsPerUnit = $finished->pcs_per_unit ?? 1;
                 $receivedPcs = $qty * $pcsPerUnit;
-    
+            
+                // Compute previous quantity before addition
+                $previousQuantity = $finished->quantity_pcs;
+            
+                // Update quantities
                 $finished->quantity_pcs += $receivedPcs;
-                
                 $finished->quantity = floor($finished->quantity_pcs / $pcsPerUnit);
-                
                 $finished->save();
-                
+            
+                // Track for notifications
                 $affectedInventoryIds[] = $finished->id;
-    
+            
+                // Log activity with previous and remaining quantities
                 \App\Models\InventoryActivityLog::create([
                     'employee_id' => $employeeId,
-                    'module'      => 'Purchase Order',
-                    'type'        => 'Finished Goods',
-                    'item_name'   => $item->item_name,
-                    'quantity'    => $receivedPcs,
-                    'processed_at'=> now(),
+                    'module' => 'Purchase Order',
+                    'type' => 'Finished Goods',
+                    'item_name' => $item->item_name,
+                    'quantity' => $receivedPcs,
+                    'previous_quantity' => $previousQuantity,
+                    'remaining_quantity' => $finished->quantity_pcs,
+                    'processed_at' => now(),
                 ]);
             }
+            
     
             $order->load('items');
             $totalOrdered  = $order->items->sum('quantity');

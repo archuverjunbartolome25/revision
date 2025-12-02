@@ -537,7 +537,7 @@ function SalesReport() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}
@@ -1052,7 +1052,9 @@ function SalesReport() {
 								<th>Date Processed</th>
 								<th>Time Processed</th>
 								<th>Item Name</th>
-								<th>Quantity</th>
+								<th>Previous Quantity (pcs)</th>
+								<th>Quantity (pcs)</th>
+								<th>Total Quantity (pcs)</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -1091,10 +1093,15 @@ function SalesReport() {
 											<td>{new Date(log.processed_at).toLocaleDateString()}</td>
 											<td>{new Date(log.processed_at).toLocaleTimeString()}</td>
 											<td>{log.item_name}</td>
+											<td>{formatNumber(log.previous_quantity)}</td>
 											<td style={{ color, fontWeight: "bold" }}>
 												{sign}
-												{formatNumber(log.quantity)}
+												{formatNumber(log.quantity)}{" "}
+												{log.unit != "pieces"
+													? `(${log.pcs_per_unit} pcs per ${log.unit})`
+													: `${log.unit}`}
 											</td>
+											<td>{formatNumber(log.remaining_quantity)}</td>
 										</tr>
 									);
 								})

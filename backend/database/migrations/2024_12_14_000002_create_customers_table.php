@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('billing_address');
             $table->string('shipping_address');
             $table->string('bank_details')->nullable();
-            $table->string('tin')->nullable();
             $table->string('status')->default('Active');
             $table->timestamps();
         });

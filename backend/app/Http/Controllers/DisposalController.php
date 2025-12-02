@@ -43,7 +43,7 @@ class DisposalController extends Controller
     {
         $validated = $request->validate([
             'disposal_date' => 'required|date',
-            'employee_id'   => 'required|string',
+            'employee_id' => 'required|integer',
             'item_type'     => 'required|string',
             'item'          => 'required|string',
             'quantity'      => 'required|numeric|min:1',

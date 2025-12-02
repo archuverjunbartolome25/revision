@@ -65,8 +65,25 @@
       font-weight: bold;
     }
 
+    .total-row.no-middle-border td {
+      border-left: none;   /* Remove left border */
+      border-right: none;  /* Remove right border */
+    }
+
+    /* Keep top/bottom borders if you want the row line */
+    .total-row.no-middle-border td:first-child {
+      border-left: 1px solid #000; /* Optional: keep first cell border */
+    }
+    .total-row.no-middle-border td:last-child {
+      border-right: 1px solid #000; /* Optional: keep last cell border */
+    }
+
     .text-right {
       text-align: right;
+    }
+
+    .text-center {
+      text-align: center;
     }
 
     .terms {
@@ -121,7 +138,7 @@
         </tr>
         <tr>
           <td>Order Date:</td>
-          <td>{{ $order->date }}</td>
+          <td>{{ \Carbon\Carbon::parse($order->date)->format('F d, Y')}}</td>
           <td>Billing Address:</td>
           <td>{{ $customer?->billing_address ?? 'N/A' }}</td>
         </tr>
@@ -131,16 +148,9 @@
           <td>Shipping Address:</td>
           <td>{{ $customer?->shipping_address ?? 'N/A' }}</td>
         </tr>
-        <tr>
-          <td></td>
-          <td></td>
-          <td>TIN:</td>
-          <td>{{ $customer?->tin ?? 'N/A' }}</td>
-        </tr>
       </tbody>
     </table>
 
-    <!-- ITEMS TABLE -->
     <table class="items-table">
       <thead>
         <tr>
@@ -151,35 +161,29 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>350ml</td>
-          <td>{{ $order->qty_350ml ?? 0 }}</td>
-          <td>₱130.00</td>
-          <td>₱{{ number_format(($order->qty_350ml ?? 0) * 130, 2) }}</td>
+        @foreach($items as $item)
+          <tr>
+              <td>{{ $item['product'] }}</td>
+              <td class="text-center">{{ $item['quantity'] }}</td>
+              <td>₱{{ number_format($item['unit_price'], 2) }}</td>
+              <td>₱{{ number_format($item['total_price'], 2) }}</td>
+          </tr>
+        @endforeach
+
+        <tr class="total-row no-middle-border">
+          <td>Grand Total:</td>
+          <td></td>
+          <td></td>
+          <td class="text-left">
+            ₱{{ number_format($order->amount - ($order->amount * ($customer?->discounts / 100)), 2) }}
+          </td>
         </tr>
-        <tr>
-          <td>500ml</td>
-          <td>{{ $order->qty_500ml ?? 0 }}</td>
-          <td>₱155.00</td>
-          <td>₱{{ number_format(($order->qty_500ml ?? 0) * 155, 2) }}</td>
-        </tr>
-        <tr>
-          <td>1L</td>
-          <td>{{ $order->qty_1L ?? 0 }}</td>
-          <td>₱130.00</td>
-          <td>₱{{ number_format(($order->qty_1L ?? 0) * 130, 2) }}</td>
-        </tr>
-        <tr>
-          <td>6L</td>
-          <td>{{ $order->qty_6L ?? 0 }}</td>
-          <td>₱60.00</td>
-          <td>₱{{ number_format(($order->qty_6L ?? 0) * 60, 2) }}</td>
-        </tr>
+
       </tbody>
     </table>
 
     <!-- TOTALS TABLE -->
-    <table>
+    <!-- <table>
       <tr>
         <td style="width: 50%;">Payment Details:</td>
         <td style="width: 25%;">Subtotal:</td>
@@ -204,7 +208,7 @@
           ₱{{ number_format($order->amount - ($order->amount * ($customer?->discounts / 100)), 2) }}
         </td>
       </tr>
-    </table>
+    </table> -->
 
     <!-- TERMS -->
     <div class="terms">

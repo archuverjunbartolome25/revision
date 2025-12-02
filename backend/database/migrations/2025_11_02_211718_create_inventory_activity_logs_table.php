@@ -21,6 +21,8 @@ public function up()
         $table->string('item_name');
         $table->integer('quantity'); // + or - value
         $table->timestamp('processed_at')->useCurrent();
+        $table->integer('previous_quantity')->nullable();
+        $table->integer('remaining_quantity')->nullable();
         $table->timestamps();
     });
 }

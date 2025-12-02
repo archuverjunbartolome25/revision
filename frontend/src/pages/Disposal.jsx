@@ -273,12 +273,14 @@ function Disposal() {
 				const response = await axios.get(
 					`http://localhost:8000/api/users/${storedEmployeeID}`
 				);
+
+				console.log("Response", response);
 				if (response.data) {
 					const fullName = `${response.data.firstname || ""} ${
 						response.data.lastname || ""
 					}`.trim();
 					setUserFullName(fullName || "Unknown User");
-					setEmployeeID(response.data.employee_id || storedEmployeeID);
+					setEmployeeID(response.data.id);
 					setUserFirstName(response.data.firstname || "");
 					setRole(response.data.role || "");
 				}
@@ -354,6 +356,7 @@ function Disposal() {
 		selectedRows.length === filteredDisposals.length;
 
 	const handleSaveDisposal = async () => {
+		console.log(employeeID);
 		try {
 			// Filter valid items
 			const items = (newDisposal.items ?? [])
@@ -371,14 +374,13 @@ function Disposal() {
 
 			const disposalDate =
 				newDisposal.disposal_date || new Date().toISOString().split("T")[0];
-			const employeeID = localStorage.getItem("employeeID");
 			const reason = newDisposal.reason || "Not specified";
 
 			// Save each disposal item
 			for (const item of items) {
 				await axios.post("http://localhost:8000/api/disposals", {
 					disposal_date: disposalDate,
-					employee_id: employeeID,
+					employee_id: Number(employeeID),
 					item_type: item.item_type,
 					item: item.item,
 					quantity: item.quantity,
@@ -505,7 +507,7 @@ function Disposal() {
 									isActive ? "nav-link active-link" : "nav-link"
 								}
 							>
-								<FaUndo className="icon" /> Return To Vendor
+								<FaUndo className="icon" /> Returns
 							</NavLink>
 						</li>
 					)}
