@@ -12,18 +12,19 @@ class ReturnToVendorItem extends Model
     protected $fillable = [
         'return_id',
         'product_id',
+        'product_type', 
         'quantity',
     ];
 
-    // Relationship to Inventory product
-    public function product()
+
+    public function productable()
     {
-        return $this->belongsTo(Inventory::class, 'product_id');
+        return $this->morphTo();
     }
 
-    // Relationship back to ReturnToVendor
-public function return() {
-    return $this->belongsTo(ReturnToVendor::class, 'return_id');
-}
 
+    public function return()
+    {
+        return $this->belongsTo(ReturnToVendor::class, 'return_id');
+    }
 }

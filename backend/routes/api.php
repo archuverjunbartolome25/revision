@@ -119,6 +119,7 @@ Route::prefix('purchase-orders')->group(function () {
     Route::put('{id}', [PurchaseOrderController::class, 'update']);
     Route::delete('{id}', [PurchaseOrderController::class, 'destroy']);
     Route::post('{id}/receive', [PurchaseOrderController::class, 'receiveItems']);
+    Route::post('{id}/mark-as-complete', [PurchaseOrderController::class, 'markAsComplete']);
     Route::get('{id}/delivery-note', [PurchaseOrderController::class, 'generateDeliveryNote'])->name('purchase_orders.delivery_note');
 
     Route::get('pending-count', [PurchaseOrderController::class, 'getPendingCount']);
@@ -152,8 +153,14 @@ Route::prefix('users')->group(function () {
 // ============================
 // FORECAST
 // ============================
-Route::get('historical-sales', [ForecastController::class, 'historicalSales']);
-Route::get('forecast', [ForecastController::class, 'forecast']);
+// Route::get('historical-sales', [ForecastController::class, 'historicalSales']);
+// Route::get('forecast', [ForecastController::class, 'forecast']);
+Route::prefix('forecast')->group(function () {
+    Route::get('/products', [ForecastController::class, 'getAvailableProducts']);
+    Route::get('/historical-sales', [ForecastController::class, 'historicalSales']);
+    Route::get('/predict', [ForecastController::class, 'forecast']);
+    Route::get('/aggregate', [ForecastController::class, 'aggregateForecast']);
+});
 
 // ============================
 // PRODUCTION OUTPUT

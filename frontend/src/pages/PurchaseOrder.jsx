@@ -456,7 +456,6 @@ function PurchaseOrder() {
 
 			// Show success message
 			showMessage("✅ Purchase Order created successfully!");
-			console.log("Purchase Order ID:", poId);
 
 			// Reset only PO number + items, keep supplier & expected_date
 			setFormData((prev) => ({
@@ -524,17 +523,48 @@ function PurchaseOrder() {
 		}
 	};
 
-	const handleSupplierChange = (supplierId) => {
-		// ✅ Filter offers by selected supplier_id
-		const offers = supplierOffers.filter(
-			(offer) => offer.supplier_id === parseInt(supplierId)
-		);
+	const [isMarkAsCompleteLoading, setIsMarkAsCompleteLoading] = useState(false);
+	const [
+		isConfirmMarkAsCompleteModalOpen,
+		setIsConfirmMarkAsCompleteModalOpen,
+	] = useState(false);
 
-		// Store filtered items (these are the offered materials)
-		setFilteredItems(offers);
+	const handleMarkAsComplete = async () => {
+		if (isMarkAsCompleteLoading) return;
+		setIsMarkAsCompleteLoading(true);
 
-		// Clear current item list to avoid mixing supplier items
-		setItems([{ item_name: "", quantity: 0 }]);
+		try {
+			await ensureCsrf();
+
+			// 🔥 Backend no longer accepts items or quantities
+			const response = await api.post(
+				`/api/purchase-orders/${selectedOrder.id}/mark-as-complete`
+			);
+
+			console.log(response);
+
+			const { rts_created } = response.data;
+
+			if (rts_created) {
+				showMessage(
+					"⚠️ Some items were not received. RTS record has been created."
+				);
+			} else {
+				showMessage("✅ Purchase Order marked as complete!");
+			}
+
+			// close modals + refresh
+			setIsConfirmMarkAsCompleteModalOpen(false);
+			await fetchOrders();
+			await fetchReceivedItems();
+			setSelectedOrder(null);
+			setOrderItems([]);
+		} catch (err) {
+			console.error("Error completing order:", err);
+			showMessage("❌ Failed to complete order.");
+		} finally {
+			setIsMarkAsCompleteLoading(false);
+		}
 	};
 
 	const handleSelectAll = () => {
@@ -1524,9 +1554,24 @@ function PurchaseOrder() {
 							</tbody>
 						</table>
 						<hr />
-						<div className="text-end">
+						<div className="flex justify-between">
 							{selectedOrder.status && (
-								<>
+								<div>
+									{(selectedOrder.status.toLowerCase() === "pending" ||
+										selectedOrder.status.toLowerCase() ===
+											"partially received") && (
+										<button
+											className="btn btn-primary btn-sm me-2"
+											onClick={() => setIsConfirmMarkAsCompleteModalOpen(true)}
+										>
+											Mark as Complete
+										</button>
+									)}
+								</div>
+							)}
+
+							{selectedOrder.status && (
+								<div>
 									{(selectedOrder.status.toLowerCase() === "pending" ||
 										selectedOrder.status.toLowerCase() ===
 											"partially received") && (
@@ -1550,7 +1595,7 @@ function PurchaseOrder() {
 											Generate PDF
 										</button>
 									)}
-								</>
+								</div>
 							)}
 						</div>
 					</div>
@@ -1855,6 +1900,35 @@ function PurchaseOrder() {
 								onClick={handleFormSubmit}
 							>
 								Submit
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{isConfirmMarkAsCompleteModalOpen && (
+				<div className="custom-modal-backdrop">
+					<div className="custom-modal">
+						<h5>Mark this Purchase Order as Complete?</h5>
+						<p>
+							Are you sure you want to mark the selected order(s) as complete?
+							This action cannot be undone.
+						</p>
+						<div className="text-end">
+							<button
+								className="btn btn-danger btn-sm me-2"
+								onClick={() => handleMarkAsComplete(selectedOrder.id)}
+							>
+								Yes
+							</button>
+							<button
+								className="btn btn-secondary btn-sm"
+								onClick={() => {
+									setIsConfirmMarkAsCompleteModalOpen(false);
+									setSelectedOrder(null);
+								}}
+							>
+								No
 							</button>
 						</div>
 					</div>

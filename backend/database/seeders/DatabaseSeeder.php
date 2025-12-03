@@ -25,13 +25,13 @@ public function run(): void
         SuppliersTableSeeder::class,
         SupplierOffersTableSeeder::class,
         SalesOrdersTableSeeder::class,
-        ReturnToVendorTableSeeder::class,
-        ReturnToVendorItemTableSeeder::class,
         PurchaseOrdersSeeder::class,
         PurchaseOrderItemsSeeder::class,
         PurchaseReceiptsSeeder::class,
         ProductionOutputsSeeder::class,
         InventoryActivityLogsSeeder::class,
+        ReturnToVendorTableSeeder::class,
+        ReturnToVendorItemTableSeeder::class,
         DisposalsSeeder::class,
     ]);
 }

@@ -13,14 +13,40 @@ class ReturnToVendorController extends Controller
     /**
      * Get all Return to Vendor records with items
      */
-    public function index()
-    {
-        $returns = ReturnToVendor::with([
-            'customer:id,name',
-            'items.product:id,item,unit'
-        ])->orderByDesc('date_returned')->get();
+    // public function index()
+    // {
+    //     $returns = ReturnToVendor::with([
+    //         'customer:id,name',
+    //         'items.product:id,item,unit'
+    //     ])->orderByDesc('date_returned')->get();
 
-        return response()->json($returns);
+    //     return response()->json($returns);
+    // }
+
+    function index()
+    {
+        // 1️⃣ Customer Returns
+        $returnToVendor = ReturnToVendor::with([
+            'customer:id,name',             
+            'items.productable:id,item,unit'  
+        ])
+        ->whereNotNull('customer_id')
+        ->orderByDesc('date_returned')
+        ->get();
+    
+        // 2️⃣ Supplier Returns
+        $returnToSupplier = ReturnToVendor::with([
+            'supplier:id,name,address',
+            'items.productable:id,item,unit'
+        ])
+        ->whereNotNull('supplier_id')
+        ->orderByDesc('date_returned')
+        ->get();
+    
+        return response()->json([
+            'returnToVendor'   => $returnToVendor,
+            'returnToSupplier' => $returnToSupplier,
+        ]);
     }
 
     /**
@@ -35,62 +61,123 @@ class ReturnToVendorController extends Controller
     /**
      * Store new Return to Vendor record (dynamic)
      */
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'rtv_number'    => 'nullable|string|max:255',
-        'customer_id'   => 'required|integer|exists:customers,id',
+// public function store(Request $request)
+// {
+//     $validated = $request->validate([
+//         'rtv_number'    => 'nullable|string|max:255',
+//         'customer_id'   => 'required|integer|exists:customers,id',
+//         'location'      => 'nullable|string',
+//         'date_ordered'  => 'required|date',
+//         'date_returned' => 'required|date',
+//         'products'      => 'required|array',
+//         'products.*.product_id' => 'required|integer|exists:inventories,id',
+//         'products.*.quantity'   => 'required|integer|min:1',
+//         'status'        => 'nullable|string|in:Pending,Approved',
+//     ]);
+
+//     DB::beginTransaction();
+//     try {
+//         // Create Return Record
+//         $return = ReturnToVendor::create([
+//             'rtv_number'    => $validated['rtv_number'] ?? null,
+//             'customer_id'   => $validated['customer_id'],
+//             'location'      => $validated['location'] ?? '',
+//             'date_ordered'  => $validated['date_ordered'],
+//             'date_returned' => $validated['date_returned'],
+//             'status'        => $validated['status'] ?? 'Pending',
+//         ]);
+
+//         // Attach products dynamically
+//         foreach ($validated['products'] as $product) {
+//             // Insert into return_to_vendor_items
+//             $item = ReturnToVendorItem::create([
+//                 'return_id'  => $return->id, // ✅ correct column
+//                 'product_id' => $product['product_id'],
+//                 'quantity'   => $product['quantity'],
+//             ]);
+
+//             // Deduct from inventory
+//             DB::table('inventories')
+//                 ->where('id', $product['product_id'])
+//                 ->decrement('quantity', $product['quantity']);
+//         }
+
+//         DB::commit();
+
+//         return response()->json([
+//             'message' => 'Return to Vendor record saved successfully.',
+//             'data'    => $return->load('items.product')
+//         ], 201);
+
+//     } catch (\Exception $e) {
+//         DB::rollBack();
+//         return response()->json([
+//             'error'   => 'Failed to save record.',
+//             'message' => $e->getMessage()
+//         ], 500);
+//     }
+// }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+        'customer_id'   => 'required|integer|exists:customers,id', // must have a customer
         'location'      => 'nullable|string',
         'date_ordered'  => 'required|date',
         'date_returned' => 'required|date',
-        'products'      => 'required|array',
-        'products.*.product_id' => 'required|integer|exists:inventories,id',
+        'products'      => 'required|array|min:1',
+        'products.*.product_id' => 'required|integer',
         'products.*.quantity'   => 'required|integer|min:1',
         'status'        => 'nullable|string|in:Pending,Approved',
-    ]);
-
-    DB::beginTransaction();
-    try {
-        // Create Return Record
-        $return = ReturnToVendor::create([
-            'rtv_number'    => $validated['rtv_number'] ?? null,
-            'customer_id'   => $validated['customer_id'],
-            'location'      => $validated['location'] ?? '',
-            'date_ordered'  => $validated['date_ordered'],
-            'date_returned' => $validated['date_returned'],
-            'status'        => $validated['status'] ?? 'Pending',
         ]);
 
-        // Attach products dynamically
-        foreach ($validated['products'] as $product) {
-            // Insert into return_to_vendor_items
-            $item = ReturnToVendorItem::create([
-                'return_id'  => $return->id, // ✅ correct column
-                'product_id' => $product['product_id'],
-                'quantity'   => $product['quantity'],
+        DB::beginTransaction();
+
+        try {
+            // 2️⃣ Generate RTV number
+            $datePart = now()->format('Ymd');
+            $randomPart = rand(1000, 9999);
+            $rtvNumber = "RTV-{$datePart}-{$randomPart}";
+
+            // 3️⃣ Create ReturnToVendor record
+            $return = ReturnToVendor::create([
+                'rtv_number'    => $rtvNumber,
+                'customer_id'   => $validated['customer_id'],
+                'supplier_id'   => null, // always customer RTV
+                'location'      => $validated['location'] ?? '',
+                'date_ordered'  => $validated['date_ordered'],
+                'date_returned' => $validated['date_returned'],
+                'status'        => $validated['status'] ?? 'Pending',
             ]);
 
-            // Deduct from inventory
-            DB::table('inventories')
-                ->where('id', $product['product_id'])
-                ->decrement('quantity', $product['quantity']);
+            // 4️⃣ Create ReturnToVendorItem records
+            foreach ($validated['products'] as $product) {
+                ReturnToVendorItem::create([
+                    'return_id'    => $return->id,
+                    'product_id'   => $product['product_id'],
+                    'product_type' => 'finished', // always finished for customer returns
+                    'quantity'     => $product['quantity'],
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Return to Vendor (finished goods) recorded successfully.',
+                'data'    => $return->load('items'),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error'   => 'Failed to record Return to Vendor.',
+                'message' => $e->getMessage(),
+            ], 500);
         }
-
-        DB::commit();
-
-        return response()->json([
-            'message' => 'Return to Vendor record saved successfully.',
-            'data'    => $return->load('items.product')
-        ], 201);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'error'   => 'Failed to save record.',
-            'message' => $e->getMessage()
-        ], 500);
     }
-}
+
 
 
     /**

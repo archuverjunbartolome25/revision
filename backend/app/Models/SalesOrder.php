@@ -21,11 +21,7 @@ class SalesOrder extends Model
         'date',
         'delivery_date',
         'order_type',
-        // TODO REMOVE THIS
-        'qty_350ml',
-        'qty_500ml',
-        'qty_1L',
-        'qty_6L',
+       
         'status',
         'date_delivered',
     ];
@@ -48,3 +44,4 @@ class SalesOrder extends Model
         return $this->belongsTo(Employee::class);
     }
 }
+

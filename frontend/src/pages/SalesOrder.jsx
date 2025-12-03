@@ -252,6 +252,7 @@ function SalesOrder() {
 		setSuccessMessage(message);
 		setTimeout(() => setSuccessMessage(""), 3000);
 	};
+
 	const fetchOrders = async (type = "Sales Order") => {
 		try {
 			setLoading(true); // Start loading
@@ -327,10 +328,6 @@ function SalesOrder() {
 		date: today.toISOString().split("T")[0],
 		order_type: "Standard Order",
 	});
-
-	console.log(new Date(today.getDay() + 7).toISOString().split("T")[0]);
-
-	console.log(newOrder);
 
 	const confirmDelete = async () => {
 		const idsToDelete = selectedRows.map((index) => orders[index].id);
@@ -420,7 +417,7 @@ function SalesOrder() {
 		}
 	};
 
-	const handleGeneratePdf = async () => {
+	const handleGeneratePdf = async (orderId) => {
 		if (selectedOrderIndex === null) return;
 
 		try {
@@ -1284,6 +1281,8 @@ function SalesOrder() {
 				selectedOrderIndex !== null &&
 				(() => {
 					const order = orders[selectedOrderIndex];
+
+					console.log(order);
 					// Parse quantities safely
 					let quantities = {};
 					if (order?.quantities) {
@@ -1400,7 +1399,7 @@ function SalesOrder() {
 									)}
 									<button
 										className="btn btn-success btn-sm me-2"
-										onClick={handleGeneratePdf}
+										onClick={() => handleGeneratePdf(order.id)}
 									>
 										Generate PDF
 									</button>
