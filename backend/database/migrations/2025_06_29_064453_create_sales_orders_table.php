@@ -15,17 +15,13 @@ return new class extends Migration
             $table->unsignedBigInteger('customer_id');
 
             $table->string('location');
-            $table->text('products');    
-            $table->text('quantities'); 
+            $table->jsonb('products');     // Changed from text to jsonb
+            $table->jsonb('quantities');   // Changed from text to jsonb
 
             $table->decimal('amount', 12, 2);
             $table->date('date');
             $table->date('delivery_date')->nullable();
             $table->string('order_type');
-            $table->integer('qty_350ml')->default(0);
-            $table->integer('qty_500ml')->default(0);
-            $table->integer('qty_1L')->default(0);
-            $table->integer('qty_6L')->default(0);
             $table->string('status');
             $table->date('date_delivered')->nullable();
 

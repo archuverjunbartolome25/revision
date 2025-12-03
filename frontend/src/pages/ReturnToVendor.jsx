@@ -83,15 +83,18 @@ function ReturnToVendor() {
 
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // 🆕 add this
 	const [filterDate, setFilterDate] = useState("");
+	const [supplierFilterDate, setSupplierFilterDate] = useState("");
 	const [loading, setLoading] = useState(true);
 	const submenuRef = useRef(null);
 	const location = useLocation();
 	const isReportsActive = location.pathname.startsWith("/reports");
 	const [reportsOpen, setReportsOpen] = useState(false);
 	const [searchTerm, setSearchTerm] = useState("");
+	const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [overviewOpen, setOverviewOpen] = useState(false);
-	const [orders, setOrders] = useState([]);
+	const [returnToVendorData, setReturnToVendorData] = useState([]);
+	const [returnToSupplierData, setReturnToSupplierData] = useState([]);
 	const [customers, setCustomers] = useState([]);
 	const [selectedRows, setSelectedRows] = useState([]);
 	const [successMessage, setSuccessMessage] = useState("");
@@ -123,8 +126,9 @@ function ReturnToVendor() {
 	};
 
 	const [statusFilter, setStatusFilter] = useState(""); // "" = all
+	const [supplierStatusFilter, setSupplierStatusFilter] = useState(""); // "" = all
 
-	const filteredOrders = orders
+	const filteredOrders = returnToVendorData
 		.filter((order) => {
 			const customer = customers.find((c) => c.id === order.customer_id);
 			const customerName = customer ? customer.name.toLowerCase() : "";
@@ -163,6 +167,46 @@ function ReturnToVendor() {
 			return (statusOrder[statusA] ?? 99) - (statusOrder[statusB] ?? 99);
 		});
 
+	const filteredSuppliers = returnToSupplierData
+		.filter((item) => {
+			const supplier = item.supplier;
+
+			const itemName = supplier.name.toLowerCase();
+			const location = supplier.address.toLowerCase();
+			const rtvNumber = item.rtv_number ? item.rtv_number.toLowerCase() : "";
+			const status = item.status ? item.status.toLowerCase() : "";
+			const dateOrdered = item.date_ordered
+				? item.date_ordered.toLowerCase()
+				: "";
+			const dateReturned = item.date_returned
+				? item.date_returned.toLowerCase()
+				: "";
+			const search = supplierSearchTerm.toLowerCase();
+
+			return (
+				itemName.includes(search) ||
+				location.includes(search) ||
+				rtvNumber.includes(search) ||
+				status.includes(search) ||
+				dateOrdered.includes(search) ||
+				dateReturned.includes(search)
+			);
+		})
+		.filter((order) => {
+			if (!supplierFilterDate) return true;
+			return order.date_returned?.slice(0, 10) === supplierFilterDate;
+		})
+		.filter((order) => {
+			if (!supplierStatusFilter) return true;
+			return order.status === supplierStatusFilter;
+		})
+		.sort((a, b) => {
+			const statusOrder = { pending: 0, approved: 1 }; // lowercased keys
+			const statusA = (a.status || "").toLowerCase();
+			const statusB = (b.status || "").toLowerCase();
+			return (statusOrder[statusA] ?? 99) - (statusOrder[statusB] ?? 99);
+		});
+
 	// Pagination
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 8;
@@ -170,6 +214,10 @@ function ReturnToVendor() {
 	const indexOfLastItem = currentPage * itemsPerPage;
 	const indexOfFirstItem = indexOfLastItem - itemsPerPage;
 	const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
+	const currentSuppliers = filteredSuppliers.slice(
+		indexOfFirstItem,
+		indexOfLastItem
+	);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
 	const [newReturn, setNewReturn] = useState({
@@ -292,7 +340,9 @@ function ReturnToVendor() {
 		try {
 			setLoading(true);
 			const res = await axios.get("http://localhost:8000/api/return-to-vendor");
-			setOrders(res.data);
+			setReturnToVendorData(res.data.returnToVendor);
+			setReturnToSupplierData(res.data.returnToSupplier);
+			console.log(res.data);
 		} catch (err) {
 			showMessage("❌ Failed to fetch return to vendor records.");
 		} finally {
@@ -316,7 +366,9 @@ function ReturnToVendor() {
 	}, []);
 
 	const handleSelectAll = (e) => {
-		setSelectedRows(e.target.checked ? orders.map((_, i) => i) : []);
+		setSelectedRows(
+			e.target.checked ? returnToVendorData.map((_, i) => i) : []
+		);
 	};
 
 	const handleRowCheckbox = (index) => {
@@ -326,13 +378,17 @@ function ReturnToVendor() {
 	};
 
 	const confirmDelete = async () => {
-		const idsToDelete = selectedRows.map((index) => orders[index].id);
+		const idsToDelete = selectedRows.map(
+			(index) => returnToVendorData[index].id
+		);
 		try {
 			await axios.delete("http://localhost:8000/api/return-to-vendor", {
 				data: { ids: idsToDelete },
 			});
-			const remaining = orders.filter((_, i) => !selectedRows.includes(i));
-			setOrders(remaining);
+			const remaining = returnToVendorData.filter(
+				(_, i) => !selectedRows.includes(i)
+			);
+			setReturnToVendorData(remaining);
 			setSelectedRows([]);
 			showMessage("✅ Selected record(s) deleted successfully!");
 		} catch (err) {
@@ -344,7 +400,8 @@ function ReturnToVendor() {
 	};
 
 	const isAllSelected =
-		selectedRows.length > 0 && selectedRows.length === orders.length;
+		selectedRows.length > 0 &&
+		selectedRows.length === returnToVendorData.length;
 
 	const [inventoryItems, setInventoryItems] = useState([]);
 
@@ -638,7 +695,7 @@ function ReturnToVendor() {
 				</div>
 				<hr />
 				<div className="d-flex gap-3">
-					<h2 className="topbar-title">List of Returns:</h2>
+					<h2 className="topbar-title">List of Return to Vendors:</h2>
 					<select
 						className="form-select form-select-sm"
 						style={{ width: "150px" }}
@@ -771,7 +828,160 @@ function ReturnToVendor() {
 						</button>
 						<button
 							className="btn btn-sm btn-light"
-							disabled={indexOfLastItem >= orders.length}
+							disabled={indexOfLastItem >= returnToVendorData.length}
+							onClick={() => setCurrentPage(currentPage + 1)}
+						>
+							Next →
+						</button>
+					</div>
+				</div>
+
+				<div className="d-flex justify-content-between align-items-center mb-3 mt-3 flex-wrap">
+					<div className="d-flex gap-2">
+						<input
+							type="text"
+							placeholder="Search"
+							className="form-control"
+							style={{ width: "250px" }}
+							value={supplierSearchTerm}
+							onChange={(e) => setSupplierSearchTerm(e.target.value)}
+						/>
+					</div>
+				</div>
+				<hr />
+				<div className="d-flex gap-3 mt-4">
+					<h2 className="topbar-title">List of Return to Suppliers:</h2>
+					<select
+						className="form-select form-select-sm"
+						style={{ width: "150px" }}
+						value={supplierStatusFilter}
+						onChange={(e) => setSupplierStatusFilter(e.target.value)}
+					>
+						<option value="">All Status</option>
+						<option value="Pending">Pending</option>
+						<option value="Approved">Approved</option>
+					</select>
+					<div className="flex gap-0">
+						<input
+							type="date"
+							className="form-control rounded-end-0"
+							style={{ width: "180px" }}
+							value={supplierFilterDate}
+							max={new Date().toISOString().split("T")[0]}
+							onChange={(e) => setSupplierFilterDate(e.target.value)}
+						/>
+						<button
+							className="btn btn-secondary btn-sm rounded-start-0"
+							onClick={() => setSupplierFilterDate("")} // Show all
+							disabled={!supplierFilterDate}
+						>
+							Show All
+						</button>{" "}
+					</div>
+				</div>
+
+				<div className="topbar-inventory-box mt-2">
+					<table className="custom-table">
+						<thead>
+							<tr>
+								<th>
+									<input
+										type="checkbox"
+										checked={isAllSelected}
+										onChange={handleSelectAll}
+									/>
+								</th>
+								<th>Return to Supplier #</th>
+								<th>Supplier Name</th>
+								<th>Date Ordered</th>
+								<th>Date Returned</th>
+								<th>Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							{loading ? (
+								// 🦴 Skeleton placeholders (5 rows)
+								[...Array(5)].map((_, i) => (
+									<tr key={i} className="animate-pulse">
+										<td>
+											<Skeleton width={25} height={20} />
+										</td>
+										<td>
+											<Skeleton width={150} height={20} />
+										</td>
+										<td>
+											<Skeleton width={120} height={20} />
+										</td>
+										<td>
+											<Skeleton width={120} height={20} />
+										</td>
+										<td>
+											<Skeleton width={80} height={20} />
+										</td>
+										<td>
+											<Skeleton width={80} height={20} />
+										</td>
+									</tr>
+								))
+							) : // TODO RECHECK THE TABLE FILTERINGS AND THE RETURN TO VENDOR FIELDS + MARK AS COMPLETE API INTEGRATION AND ADD RETURN TO VENDOR API CONTROLLER REFACTOR
+							currentSuppliers.length > 0 ? (
+								currentSuppliers.map((supplier, index) => {
+									const name = supplier.supplier ? supplier.name : "Unknown";
+									const globalIndex = indexOfFirstItem + index;
+
+									return (
+										<tr
+											key={supplier.id}
+											onClick={() => handleRowClick(supplier)}
+											style={{ cursor: "pointer" }}
+										>
+											<td>
+												<input
+													type="checkbox"
+													checked={selectedRows.includes(globalIndex)}
+													onChange={() => handleRowCheckbox(globalIndex)}
+													onClick={(e) => e.stopPropagation()} // ⛔ stops row click
+												/>
+											</td>
+											<td>{supplier.rtv_number || "N/A"}</td>
+											<td>{supplier.supplier.name}</td>
+											<td>{formatDate(supplier.date_ordered)}</td>
+											<td>{formatDate(supplier.date_returned)}</td>
+											<td>
+												<span
+													className={`badge ${
+														supplier.status === "Approved"
+															? "bg-success"
+															: "bg-warning text-dark"
+													}`}
+												>
+													{supplier.status}
+												</span>
+											</td>
+										</tr>
+									);
+								})
+							) : (
+								<tr>
+									<td colSpan="5" className="text-center text-muted py-3">
+										No return records found
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+
+					<div className="d-flex justify-content-between mt-2">
+						<button
+							className="btn btn-sm btn-light"
+							disabled={currentPage === 1}
+							onClick={() => setCurrentPage(currentPage - 1)}
+						>
+							← Previous
+						</button>
+						<button
+							className="btn btn-sm btn-light"
+							disabled={indexOfLastItem >= returnToVendorData.length}
 							onClick={() => setCurrentPage(currentPage + 1)}
 						>
 							Next →

@@ -7,87 +7,60 @@ use Illuminate\Support\Facades\DB;
 
 class ReturnToVendorTableSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        DB::table('return_to_vendor')->insert([
+        $returns = [
+            // Customer RTVs
             [
                 'id' => 1,
                 'customer_id' => 1,
-                'location' => 'P1 Block 25 Lot 25, Katapatan Subdivision, Barangay Banay-banay, Cabuyao City, Laguna',
+                'supplier_id' => null,
+                'location' => 'Cabuyao Branch',
                 'date_ordered' => '2025-11-03',
                 'date_returned' => '2025-11-03',
-                'qty_350ml' => 1,
-                'qty_500ml' => 0,
-                'qty_1l' => 0,
-                'qty_6l' => 0,
-                'created_at' => '2025-11-03 00:40:23',
-                'updated_at' => '2025-11-03 00:40:28',
-                'rtv_number' => 'RTV-20251102-3369',
                 'status' => 'Approved',
             ],
             [
                 'id' => 2,
                 'customer_id' => 1,
-                'location' => 'P1 Block 25 Lot 25, Katapatan Subdivision, Barangay Banay-banay, Cabuyao City, Laguna',
-                'date_ordered' => '2025-11-03',
-                'date_returned' => '2025-11-03',
-                'qty_350ml' => 2,
-                'qty_500ml' => 0,
-                'qty_1l' => 0,
-                'qty_6l' => 0,
-                'created_at' => '2025-11-03 19:35:13',
-                'updated_at' => '2025-11-03 19:35:24',
-                'rtv_number' => 'RTV-20251103-4836',
+                'supplier_id' => null,
+                'location' => 'Cabuyao Branch',
+                'date_ordered' => '2025-11-04',
+                'date_returned' => '2025-11-04',
                 'status' => 'Approved',
             ],
+
+            // Supplier RTSs
             [
                 'id' => 3,
-                'customer_id' => 1,
-                'location' => 'P1 Block 25 Lot 25, Katapatan Subdivision, Barangay Banay-banay, Cabuyao City, Laguna',
-                'date_ordered' => '2025-11-03',
-                'date_returned' => '2025-11-03',
-                'qty_350ml' => 2,
-                'qty_500ml' => 0,
-                'qty_1l' => 0,
-                'qty_6l' => 0,
-                'created_at' => '2025-11-03 21:14:29',
-                'updated_at' => '2025-11-03 21:14:42',
-                'rtv_number' => 'RTV-20251103-4725',
-                'status' => 'Approved',
+                'customer_id' => null,
+                'supplier_id' => 1,
+                'location' => 'Supplier Warehouse',
+                'date_ordered' => '2025-11-05',
+                'date_returned' => '2025-11-05',
+                'status' => 'Pending',
             ],
             [
                 'id' => 4,
-                'customer_id' => 1,
-                'location' => 'P1 Block 25 Lot 25, Katapatan Subdivision, Barangay Banay-banay, Cabuyao City, Laguna',
-                'date_ordered' => '2025-11-03',
-                'date_returned' => '2025-11-03',
-                'qty_350ml' => 1,
-                'qty_500ml' => 0,
-                'qty_1l' => 0,
-                'qty_6l' => 0,
-                'created_at' => '2025-11-03 22:32:33',
-                'updated_at' => '2025-11-03 22:32:46',
-                'rtv_number' => 'RTV-20251103-9599',
-                'status' => 'Approved',
+                'customer_id' => null,
+                'supplier_id' => 2,
+                'location' => 'Supplier Warehouse',
+                'date_ordered' => '2025-11-06',
+                'date_returned' => '2025-11-06',
+                'status' => 'Pending',
             ],
-            [
-                'id' => 5,
-                'customer_id' => 1,
-                'location' => 'P1 Block 25 Lot 25, Katapatan Subdivision, Barangay Banay-banay, Cabuyao City, Laguna',
-                'date_ordered' => '2025-11-04',
-                'date_returned' => '2025-11-04',
-                'qty_350ml' => 1,
-                'qty_500ml' => 0,
-                'qty_1l' => 0,
-                'qty_6l' => 0,
-                'created_at' => '2025-11-04 15:47:15',
-                'updated_at' => '2025-11-04 15:47:46',
-                'rtv_number' => 'RTV-20251104-1126',
-                'status' => 'Approved',
-            ],
-        ]);
+        ];
+
+        // Generate RTV/RTS number for each row
+        foreach ($returns as &$return) {
+            $prefix = $return['supplier_id'] ? 'RTS' : 'RTV';
+            $datePart = date('Ymd', strtotime($return['date_ordered'] ?? now()));
+            $randomPart = rand(1000, 9999);
+            $return['rtv_number'] = "{$prefix}-{$datePart}-{$randomPart}";
+            $return['created_at'] = now();
+            $return['updated_at'] = now();
+        }
+
+        DB::table('return_to_vendor')->insert($returns);
     }
 }

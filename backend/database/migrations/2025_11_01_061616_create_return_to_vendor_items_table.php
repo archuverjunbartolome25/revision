@@ -6,11 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
         Schema::create('return_to_vendor_items', function (Blueprint $table) {
@@ -24,24 +19,16 @@ return new class extends Migration
                   ->onDelete('cascade');
 
 
-            $table->unsignedBigInteger('product_id');
-            $table->foreign('product_id')
-                  ->references('id')
-                  ->on('inventories')
-                  ->onDelete('restrict');
+            $table->unsignedBigInteger('product_id');  
+            $table->string('product_type');
 
-            // Quantity field
-            $table->integer('quantity');
+
+            $table->integer('quantity')->default(0);
 
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down()
     {
         Schema::dropIfExists('return_to_vendor_items');
