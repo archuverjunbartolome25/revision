@@ -1139,7 +1139,8 @@ function Disposal() {
 								onClick={async () => {
 									try {
 										await axios.post(
-											`http://localhost:8000/api/disposals/${selectedDisposal.id}/dispose`
+											`http://localhost:8000/api/disposals/${selectedDisposal.id}/dispose`,
+											{ employee_id: localStorage.getItem("employeeID") }
 										);
 										showMessage("✅ Marked as disposed successfully!");
 										setShowDetailsModal(false);

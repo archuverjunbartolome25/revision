@@ -14,11 +14,11 @@ class PurchaseOrder extends Model
     protected $fillable = [
         'po_number',
         'supplier_name',
-
         'order_date',
         'expected_date',
         'status',
         'amount',
+        'created_by',
     ];
 
 

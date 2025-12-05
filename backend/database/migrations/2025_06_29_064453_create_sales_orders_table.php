@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('sales_orders', function (Blueprint $table) {
             $table->id();
             
-            $table->unsignedBigInteger('employee_id')->nullable();
             $table->unsignedBigInteger('customer_id');
  
             $table->string('location');
@@ -24,11 +23,11 @@ return new class extends Migration
             $table->string('order_type');
             $table->string('status');
             $table->date('date_delivered')->nullable();
+            $table->string('employee_id')->nullable();
 
             $table->timestamps();
 
             $table->foreign('customer_id')->references('id')->on('customers');
-            $table->foreign('employee_id')->references('id')->on('users');
         });
     }
 

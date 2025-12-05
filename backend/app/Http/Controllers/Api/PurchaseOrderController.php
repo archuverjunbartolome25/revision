@@ -20,6 +20,27 @@ class PurchaseOrderController extends Controller
         return response()->json(PurchaseOrder::with('items')->get());
     }
 
+
+    // * v1
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'po_number'      => 'required|unique:purchase_orders',
+    //         'supplier_name'  => 'required|string',
+    //         'order_date'     => 'required|date',
+    //         'expected_date'  => 'required|date',
+    //         'status'         => 'required|string',
+    //         'amount'         => 'required|numeric'
+    //     ]);
+
+    //     $order = PurchaseOrder::create($request->only([
+    //         'po_number', 'supplier_name', 'order_date', 'expected_date', 'status', 'amount'
+    //     ]));
+
+    //     return response()->json($order, 201);
+    // }
+
+    // *v2
     public function store(Request $request)
     {
         $request->validate([
@@ -28,14 +49,44 @@ class PurchaseOrderController extends Controller
             'order_date'     => 'required|date',
             'expected_date'  => 'required|date',
             'status'         => 'required|string',
-            'amount'         => 'required|numeric'
+            'amount'         => 'required|numeric',
+            'employee_id'    => 'required|string',
         ]);
 
-        $order = PurchaseOrder::create($request->only([
-            'po_number', 'supplier_name', 'order_date', 'expected_date', 'status', 'amount'
-        ]));
+        DB::beginTransaction();
 
-        return response()->json($order, 201);
+        try {
+            $creatorId = \App\Models\User::where('employeeID', $request->employee_id)->value('id');
+
+            if (!$creatorId) {
+                DB::rollBack();
+                return response()->json(['error' => 'Invalid employee ID'], 422);
+            }
+            
+            $order = PurchaseOrder::create(array_merge(
+                $request->only([
+                    'po_number', 'supplier_name', 'order_date', 'expected_date', 'status', 'amount', 'employee_id'
+                ]),
+                ['created_by' => $creatorId] 
+            ));
+
+            \App\Models\AuditLog::create([
+                'module' => 'Purchase Order',
+                'record_id' => $order->id,
+                'action' => 'Created',
+                'status' => 'Pending',
+                'created_by' => $creatorId,
+                'performed_by' => $creatorId, 
+            ]);
+
+            DB::commit();
+
+            return response()->json($order, 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function destroy($id)
@@ -235,6 +286,16 @@ class PurchaseOrderController extends Controller
     // }
 
 
+    function getOriginalCreator($module, $recordId)
+    {
+        $firstLog = \App\Models\AuditLog::where('module', $module)
+                            ->where('record_id', $recordId)
+                            ->orderBy('created_at', 'asc')
+                            ->first();
+        
+        return $firstLog ? $firstLog->created_by : null;
+    }
+
     // *v2
     public function receiveItems(Request $request, $id)
     {
@@ -242,30 +303,31 @@ class PurchaseOrderController extends Controller
             'item_id'  => 'required|exists:purchase_order_items,id',
             'quantity' => 'required|integer|min:1',
             'image'    => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'employee_id' => 'required|string', 
         ]);
-
+    
         $affectedRawMatIds = [];
         $affectedInventoryIds = [];
-
+    
         DB::beginTransaction();
-
+    
         try {
             $order = PurchaseOrder::with('items')->findOrFail($id);
             $item  = $order->items()->where('id', $request->item_id)->firstOrFail();
-
+    
             $qty = (int) $request->quantity;
             $remaining = ($item->quantity ?? 0) - ($item->received_quantity ?? 0);
-
+    
             if ($qty > $remaining) {
                 DB::rollBack();
                 return response()->json([
                     'error' => "Cannot receive more than remaining quantity ({$remaining})."
                 ], 422);
             }
-
+    
             $item->received_quantity = ($item->received_quantity ?? 0) + $qty;
             $item->save();
-
+    
             $imagePath = null;
             $imageMime = null;
             if ($request->hasFile('image')) {
@@ -273,7 +335,7 @@ class PurchaseOrderController extends Controller
                 $imageMime = $file->getMimeType();
                 $imagePath = $file->store('receipts', 'public');
             }
-
+    
             $receiptId = DB::table('purchase_receipts')->insertGetId([
                 'purchase_order_id'      => $order->id,
                 'purchase_order_item_id' => $item->id,
@@ -286,22 +348,21 @@ class PurchaseOrderController extends Controller
                 'created_at'             => now(),
                 'updated_at'             => now(),
             ]);
-
+    
             $employeeId = $order->employee_id ?? ($request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN');
-
-            // Update inventory for raw materials or finished goods
+    
             $rawMat = InventoryRawmat::whereRaw('LOWER(item) = ?', [strtolower($item->item_name)])->first();
             if ($rawMat) {
                 $conversion = $rawMat->conversion ?? 1;
                 $receivedPcs = $qty * $conversion;
-
+    
                 $previousQuantity = $rawMat->quantity_pieces;
                 $rawMat->quantity_pieces += $receivedPcs;
                 $rawMat->quantity = floor($rawMat->quantity_pieces / $conversion);
                 $rawMat->save();
-
+    
                 $affectedRawMatIds[] = $rawMat->id;
-
+    
                 \App\Models\InventoryActivityLog::create([
                     'employee_id' => $employeeId,
                     'module' => 'Purchase Order',
@@ -317,17 +378,17 @@ class PurchaseOrderController extends Controller
                     ['item' => $item->item_name],
                     ['unit' => 'pcs', 'quantity' => 0, 'quantity_pcs' => 0, 'low_stock_alert' => 0, 'pcs_per_unit' => 1]
                 );
-
+    
                 $pcsPerUnit = $finished->pcs_per_unit ?? 1;
                 $receivedPcs = $qty * $pcsPerUnit;
-
+    
                 $previousQuantity = $finished->quantity_pcs;
                 $finished->quantity_pcs += $receivedPcs;
                 $finished->quantity = floor($finished->quantity_pcs / $pcsPerUnit);
                 $finished->save();
-
+    
                 $affectedInventoryIds[] = $finished->id;
-
+    
                 \App\Models\InventoryActivityLog::create([
                     'employee_id' => $employeeId,
                     'module' => 'Purchase Order',
@@ -339,14 +400,13 @@ class PurchaseOrderController extends Controller
                     'processed_at' => now(),
                 ]);
             }
-
-            // Determine the new status based on received quantities
+    
             $order->load('items');
-
+    
             $allReceived = $order->items->every(function ($i) {
                 return ($i->received_quantity ?? 0) >= ($i->quantity ?? 0);
             });
-
+    
             if ($order->items->sum('received_quantity') === 0) {
                 $order->status = 'Pending';
             } elseif ($allReceived) {
@@ -354,33 +414,52 @@ class PurchaseOrderController extends Controller
             } else {
                 $order->status = 'Partially Received';
             }
-            // $order->load('items');
-
-            // $totalOrdered  = $order->items->sum('quantity');
-            // $totalReceived = $order->items->sum('received_quantity');
-            
-            // if ($totalReceived === 0) {
-            //     $order->status = 'Pending';
-            // } elseif ($totalReceived > 0 && $totalReceived < $totalOrdered) {
-            //     $order->status = 'Partially Received';
-            // } elseif ($totalReceived === $totalOrdered) {
-            //     $order->status = 'Fully Received';
-            // }
-
+    
             $order->save();
+    
+            $performerId = \App\Models\User::where('employeeID', $request->employee_id)->value('id');
 
+            if (!$performerId) {
+                DB::rollBack();
+                return response()->json(['error' => 'Invalid employee ID'], 422);
+            }
+
+            $originalAuditLog = \App\Models\AuditLog::where('module', 'Purchase Order')
+                                    ->where('record_id', $order->id)
+                                    ->where('action', 'Created')
+                                    ->orderBy('created_at', 'asc')
+                                    ->first();
+
+            if (!$originalAuditLog) {
+                DB::rollBack();
+                return response()->json(['error' => 'Purchase order audit log not found'], 422);
+            }
+
+            $originalAuditLog->update([
+                'status' => $order->status,
+            ]);
+
+            \App\Models\AuditLog::create([
+                'module' => 'Purchase Order',
+                'record_id' => $order->id,
+                'action' => 'Received',
+                'status' => $order->status,
+                'created_by' => $originalAuditLog->created_by, 
+                'performed_by' => $performerId,  
+            ]);
+    
             DB::commit();
-
+    
             $this->checkAndUpdateNotifications($affectedInventoryIds, $affectedRawMatIds);
-
+    
             $receipt = DB::table('purchase_receipts')->where('id', $receiptId)->first();
-
+    
             return response()->json([
                 'message' => 'Items received and logged successfully.',
                 'order'   => $order,
                 'receipt' => $receipt
             ]);
-
+    
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('receiveItems error: ' . $e->getMessage());
@@ -391,153 +470,12 @@ class PurchaseOrderController extends Controller
         }
     }
 
-// *v3
-    // public function receiveItems(Request $request, $id)
-    // {
-    //     $request->validate([
-    //         'item_id'   => 'required|integer',
-    //         'quantity'  => 'required|integer|min:1',
-    //         'unit_cost' => 'required|numeric|min:0',
-    //         'image'     => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-    //     ]);
-        
-   
-    //     $affectedRawMatIds = [];
-    //     $affectedInventoryIds = [];
-
-    //     DB::beginTransaction();
-
-    //     try {
-    //         $order = PurchaseOrder::with('items')->findOrFail($id);
-        
-    //         // Ensure the item exists in this purchase order
-    //         $itemTemplate = $order->items()->where('id', $request->item_id)->first();
-    //         if (!$itemTemplate) {
-    //             return response()->json([
-    //                 'error' => 'The specified item does not exist in this purchase order.'
-    //             ], 422);
-    //         }
-    
-    //         $receivedQty = (int) $request->quantity;
-    //         $remaining = ($itemTemplate->quantity ?? 0) - ($itemTemplate->received_quantity ?? 0);
-
-    //         if ($receivedQty > $remaining) {
-    //             DB::rollBack();
-    //             return response()->json([
-    //                 'error' => "Cannot receive more than remaining quantity ({$remaining})."
-    //             ], 422);
-    //         }
-
-    //         // --- Create a new PurchaseOrderItem for this received batch ---
-    //         $unitCost = (float) $request->unit_cost;
-          
-
-    //         $newItem = PurchaseOrderItem::create([
-    //             'purchase_order_id' => $order->id,
-    //             'item_name'         => $itemTemplate->item_name,
-    //             'quantity'          => $receivedQty,
-    //             'received_quantity' => $receivedQty,
-    //             'unit_cost'         => $unitCost,
-    //             'total_amount'      => $unitCost * $receivedQty,
-    //         ]);
-
-
-    //         // --- Handle receipt image ---
-    //         $imagePath = null;
-    //         $imageMime = null;
-    //         if ($request->hasFile('image')) {
-    //             $file = $request->file('image');
-    //             $imageMime = $file->getMimeType();
-    //             $imagePath = $file->store('receipts', 'public');
-    //         }
-
-    //         $receiptId = DB::table('purchase_receipts')->insertGetId([
-    //             'purchase_order_id'      => $order->id,
-    //             'purchase_order_item_id' => $newItem->id,
-    //             'po_number'              => $order->po_number,
-    //             'item_name'              => $newItem->item_name,
-    //             'quantity_received'      => $receivedQty,
-    //             'received_date'          => now(),
-    //             'image_path'             => $imagePath,
-    //             'image_mime'             => $imageMime,
-    //             'created_at'             => now(),
-    //             'updated_at'             => now(),
-    //         ]);
-
-    //         $employeeId = $order->employee_id ?? ($request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN');
-
-    //         // --- Update InventoryRawmat ---
-    //         $rawMat = InventoryRawmat::whereRaw('LOWER(item) = ?', [strtolower($itemTemplate->item_name)])->first();
-    //         if ($rawMat) {
-    //             $conversion = $rawMat->conversion ?? 1;
-    //             $previousPieces = $rawMat->quantity_pieces;
-    //             $rawMat->quantity_pieces += $receivedQty;
-    //             $rawMat->quantity = floor($rawMat->quantity_pieces / $conversion);
-    //             $rawMat->save();
-
-    //             $affectedRawMatIds[] = $rawMat->id;
-
-    //             \App\Models\InventoryActivityLog::create([
-    //                 'employee_id' => $employeeId,
-    //                 'module' => 'Purchase Order',
-    //                 'type' => 'Raw Materials',
-    //                 'item_name' => $rawMat->item,
-    //                 'quantity' => $receivedQty,
-    //                 'previous_quantity' => $previousPieces,
-    //                 'remaining_quantity' => $rawMat->quantity_pieces,
-    //                 'processed_at' => now(),
-    //             ]);
-    //         }
-
-    //         // --- Update PurchaseOrder quantities ---
-    //         $order->quantity_pieces = ($order->quantity_pieces ?? 0) + $receivedQty;
-
-    //         if ($rawMat) {
-    //             $order->quantity = floor($order->quantity_pieces / ($rawMat->conversion ?? 1));
-    //         }
-
-    //         // --- Update PurchaseOrder status ---
-    //         $allItems = $order->items()->get();
-    //         $allFullyReceived = $allItems->every(function ($i) {
-    //             return ($i->received_quantity ?? 0) >= ($i->quantity ?? 0);
-    //         });
-
-    //         if ($allItems->sum('received_quantity') === 0) {
-    //             $order->status = 'Pending';
-    //         } elseif ($allFullyReceived) {
-    //             $order->status = 'Fully Received';
-    //         } else {
-    //             $order->status = 'Partially Received';
-    //         }
-
-    //         $order->save();
-
-    //         DB::commit();
-
-    //         $this->checkAndUpdateNotifications($affectedInventoryIds, $affectedRawMatIds);
-
-    //         $receipt = DB::table('purchase_receipts')->where('id', $receiptId)->first();
-
-    //         return response()->json([
-    //             'message' => 'Items received and logged successfully.',
-    //             'order'   => $order,
-    //             'receipt' => $receipt,
-    //             'new_item'=> $newItem,
-    //         ]);
-
-    //     } catch (\Exception $e) {
-    //         DB::rollBack();
-    //         \Log::error('receiveItems error: ' . $e->getMessage());
-    //         return response()->json([
-    //             'error'   => 'Server error while receiving items.',
-    //             'details' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
-
-    public function markAsComplete($id)
+    public function markAsComplete(Request $request, $id)
     {
+        $request->validate([
+            'employee_id' => 'required|string',
+        ]);
+    
         DB::beginTransaction();
     
         try {
@@ -555,9 +493,8 @@ class PurchaseOrderController extends Controller
             });
     
             $rtsCreated = false;
-
+    
             \Log::info('UNRECEIVED ' . $order);
-
     
             if ($unreceivedItems->isNotEmpty() && $order->supplier_name) {
                 $supplier = Supplier::where('name', $order->supplier_name)->first();
@@ -592,6 +529,39 @@ class PurchaseOrderController extends Controller
                     $rtsCreated = true;
                 }
             }
+    
+         
+            $performerId = \App\Models\User::where('employeeID', $request->employee_id)->value('id');
+    
+            if (!$performerId) {
+                DB::rollBack();
+                return response()->json(['error' => 'Invalid employee ID'], 422);
+            }
+    
+            $originalAuditLog = \App\Models\AuditLog::where('module', 'Purchase Order')
+                                    ->where('record_id', $order->id)
+                                    ->where('action', 'Created')
+                                    ->orderBy('created_at', 'asc')
+                                    ->first();
+    
+            if (!$originalAuditLog) {
+                DB::rollBack();
+                return response()->json(['error' => 'Purchase order audit log not found'], 422);
+            }
+    
+            $originalAuditLog->update([
+                'status' => 'Completed',
+            ]);
+    
+            \App\Models\AuditLog::create([
+                'module' => 'Purchase Order',
+                'record_id' => $order->id,
+                'action' => 'Mark as Completed',
+                'status' => 'Completed',
+                'created_by' => $originalAuditLog->created_by, 
+                'performed_by' => $performerId,  
+            ]);
+    
             DB::commit();
     
             return response()->json([

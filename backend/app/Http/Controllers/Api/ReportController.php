@@ -8,13 +8,12 @@ use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
-
-
+use App\Models\SalesOrder;
 
 class ReportController extends Controller
 {
 
-// *NEW
+    // *NEW
     public function salesReport(Request $request)
     {
         // Fetch inventory
@@ -131,6 +130,57 @@ class ReportController extends Controller
     
         return response()->json($salesOrders);
     }
+
+    // Stat analytics
+    public function topCustomers()
+    {
+        $top = SalesOrder::selectRaw('customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount')
+            ->with('customer:id,name')
+            ->groupBy('customer_id')
+            ->orderByDesc('total_amount')
+            ->take(10)
+            ->get();
+    
+        foreach ($top as $customerData) {
+            $customerId = $customerData->customer_id;
+    
+            $orders = SalesOrder::where('customer_id', $customerId)->get();
+    
+            $summary = [];
+    
+            foreach ($orders as $order) {
+                // Decode products safely
+                $products = is_array($order->products) ? $order->products : json_decode($order->products, true) ?? [];
+                $quantities = is_array($order->quantities) ? $order->quantities : json_decode($order->quantities, true) ?? [];
+            
+                foreach ($products as $productName) {
+                    $qty = $quantities[$productName] ?? 0;
+            
+                    $totalQtyInOrder = array_sum($quantities);
+                    $productCost = $totalQtyInOrder > 0 ? ($order->amount / $totalQtyInOrder) * $qty : 0;
+            
+                    if (!isset($summary[$productName])) {
+                        $summary[$productName] = [
+                            'product' => $productName,
+                            'total_quantity' => 0,
+                            'total_cost' => 0,
+                        ];
+                    }
+            
+                    $summary[$productName]['total_quantity'] += $qty;
+                    $summary[$productName]['total_cost'] += $productCost;
+                }
+            }
+    
+            $customerData->product_summary = array_values($summary);
+        }
+    
+        return response()->json($top);
+    }
+    
+
+
+
 
     // *OLD
 // public function salesReport(Request $request)

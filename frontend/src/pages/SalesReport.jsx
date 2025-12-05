@@ -118,6 +118,20 @@ function SalesReport() {
 
 	const [stockNotifications, setStockNotifications] = useState([]);
 	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+	const [statAnalysis, setStatAnalysis] = useState([]);
+	const [selectedCustomerSummary, setSelectedCustomerSummary] = useState(null);
+
+	const [isStatAnalysisModalOpen, setIsStatAnalysisModalOpen] = useState(false);
+
+	const handleStatAnalysisClick = (customerSummary) => {
+		setSelectedCustomerSummary(customerSummary);
+		setIsStatAnalysisModalOpen(true);
+	};
+
+	const closeStatAnalysisModal = () => {
+		setSelectedCustomerSummary(null);
+		setIsStatAnalysisModalOpen(false);
+	};
 
 	const handleRowClick = (sale) => {
 		setSelectedSale(sale);
@@ -317,6 +331,8 @@ function SalesReport() {
 	const [role, setRole] = useState("");
 	const [showDropdown, setShowDropdown] = useState(false); // 👈 added to handle profile dropdown
 
+	const [employees, setEmployees] = useState({});
+
 	const isReportsActive = location.pathname.startsWith("/reports");
 
 	const fetchNotification = async () => {
@@ -333,50 +349,54 @@ function SalesReport() {
 		}
 	};
 
-	useEffect(() => {
-		const fetchSalesData = async () => {
-			try {
-				const res = await axios.get("http://localhost:8000/api/reports/sales");
-				setSalesData(res.data);
+	const fetchStatAnalysis = async () => {
+		try {
+			const endpoint = "http://localhost:8000/api/reports/stat-analysis";
 
-				console.log(res.data);
-			} catch (err) {
-				console.error("Error fetching sales report:", err);
-			} finally {
-				// ✅ Stop showing skeletons after fetch finishes (success or fail)
-				setLoading(false);
+			const res = await axios.get(endpoint);
+			console.log(res);
+
+			setStatAnalysis(res.data);
+		} catch (err) {
+			console.error("Error fetching inventory:", err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const fetchSalesData = async () => {
+		try {
+			const res = await axios.get("http://localhost:8000/api/reports/sales");
+			setSalesData(res.data);
+		} catch (err) {
+			console.error("Error fetching sales report:", err);
+		} finally {
+			// ✅ Stop showing skeletons after fetch finishes (success or fail)
+			setLoading(false);
+		}
+	};
+
+	const fetchUserData = async () => {
+		try {
+			const storedEmployeeID = localStorage.getItem("employeeID");
+			if (!storedEmployeeID) return;
+
+			const response = await axios.get(
+				`http://localhost:8000/api/users/${storedEmployeeID}`
+			);
+
+			if (response.data) {
+				const fullName = `${response.data.firstname || ""} ${
+					response.data.lastname || ""
+				}`.trim();
+				setUserFullName(fullName || "Unknown User");
+				setEmployeeID(response.data.employee_id || storedEmployeeID);
+				setRole(response.data.role || "");
 			}
-		};
-
-		fetchNotification();
-		fetchSalesData();
-	}, []);
-
-	useEffect(() => {
-		const fetchUserData = async () => {
-			try {
-				const storedEmployeeID = localStorage.getItem("employeeID");
-				if (!storedEmployeeID) return;
-
-				const response = await axios.get(
-					`http://localhost:8000/api/users/${storedEmployeeID}`
-				);
-
-				if (response.data) {
-					const fullName = `${response.data.firstname || ""} ${
-						response.data.lastname || ""
-					}`.trim();
-					setUserFullName(fullName || "Unknown User");
-					setEmployeeID(response.data.employee_id || storedEmployeeID);
-					setRole(response.data.role || "");
-				}
-			} catch (error) {
-				console.error("Error fetching user data:", error);
-			}
-		};
-
-		fetchUserData();
-	}, []);
+		} catch (error) {
+			console.error("Error fetching user data:", error);
+		}
+	};
 
 	const fetchData = async () => {
 		try {
@@ -397,28 +417,42 @@ function SalesReport() {
 			console.error("Error fetching dashboard data:", error);
 		}
 	};
+
+	const fetchEmployees = async () => {
+		try {
+			const res = await axios.get("http://localhost:8000/api/users");
+			const map = {};
+			res.data.forEach((user) => {
+				map[user.id] = user.employeeID; // adjust if your API uses employee_id
+			});
+			setEmployees(map);
+		} catch (error) {
+			console.error(error);
+		}
+	};
+
+	const fetchLogs = async () => {
+		try {
+			const response = await axios.get(
+				"http://localhost:8000/api/inventory-activity-logs"
+			);
+			setActivityLogs(response.data.data);
+		} catch (error) {
+			console.error("Error fetching activity logs:", error);
+		}
+	};
+
 	useEffect(() => {
+		fetchNotification();
+		fetchSalesData();
+		fetchStatAnalysis();
+		fetchUserData();
 		fetchData();
-	}, []);
-
-	const [employees, setEmployees] = useState({});
-
-	useEffect(() => {
-		const fetchEmployees = async () => {
-			try {
-				const res = await axios.get("http://localhost:8000/api/users");
-				const map = {};
-				res.data.forEach((user) => {
-					map[user.id] = user.employeeID; // adjust if your API uses employee_id
-				});
-				setEmployees(map);
-			} catch (error) {
-				console.error(error);
-			}
-		};
-
 		fetchEmployees();
+		fetchLogs();
 	}, []);
+
+	console.log(statAnalysis);
 
 	const processMap = {
 		sales_order: "Sales Order",
@@ -427,21 +461,6 @@ function SalesReport() {
 		purchase_order: "Purchase Order",
 		rtv: "Return To Vendor",
 	};
-
-	useEffect(() => {
-		const fetchLogs = async () => {
-			try {
-				const response = await axios.get(
-					"http://localhost:8000/api/inventory-activity-logs"
-				);
-				setActivityLogs(response.data.data);
-			} catch (error) {
-				console.error("Error fetching activity logs:", error);
-			}
-		};
-
-		fetchLogs();
-	}, []);
 
 	const getQuantityStyle = (moduleName) => {
 		switch (moduleName) {
@@ -1264,12 +1283,126 @@ function SalesReport() {
 
 					<hr />
 
+					<h1 className="topbar-title">Stat Analytics</h1>
+
+					<div className="topbar-inventory-box mt-2">
+						<table className="custom-table">
+							<thead>
+								<tr>
+									<th>Customer</th>
+									<th>Total Orders</th>
+									<th>Total Amount</th>
+								</tr>
+							</thead>
+							<tbody>
+								{loading ? (
+									[...Array(5)].map((_, i) => (
+										<tr key={i} className="animate-pulse">
+											<td>
+												<Skeleton width={100} />
+											</td>
+											<td>
+												<Skeleton width={60} />
+											</td>
+											<td>
+												<Skeleton width={80} />
+											</td>
+											<td>
+												<Skeleton width={80} />
+											</td>
+											<td>
+												<Skeleton width={80} />
+											</td>
+										</tr>
+									))
+								) : statAnalysis.length > 0 ? (
+									statAnalysis.map((customer, index) => {
+										return (
+											<tr
+												key={index}
+												onClick={() =>
+													handleStatAnalysisClick(
+														statAnalysis.find(
+															(s) =>
+																s.date === customer.date &&
+																s.customer_name === customer.customer_name
+														)
+													)
+												}
+												style={{ cursor: "pointer" }}
+											>
+												<td>{customer.customer.name}</td>
+												<td>{formatNumber(customer.total_orders)}</td>
+												<td>{formatToPeso(customer.total_amount)}</td>
+											</tr>
+										);
+									})
+								) : (
+									<tr>
+										<td colSpan="5" className="text-center">
+											No sales data available.
+										</td>
+									</tr>
+								)}
+							</tbody>
+						</table>
+					</div>
+
+					<hr />
+
 					<h2 className="topbar-title">Sold Products</h2>
 					<div className="demand-card">
 						<SalesChart />
 					</div>
 				</div>
 			</div>
+
+			{selectedCustomerSummary && isStatAnalysisModalOpen && (
+				<div className="custom-modal-backdrop">
+					<div className="custom-modal" style={{ width: "525px" }}>
+						<div className="modal-header">
+							<h4>
+								<strong>{selectedCustomerSummary.customer.name}</strong>
+							</h4>
+							<button
+								type="button"
+								className="btn-close"
+								onClick={closeStatAnalysisModal}
+							></button>
+						</div>
+						<hr />
+
+						<p>
+							<strong>Customer Orders:</strong>{" "}
+						</p>
+
+						<table
+							className="table table-bordered text-center"
+							style={{ width: "480px" }}
+						>
+							<thead>
+								<tr>
+									<th>Product Name</th>
+									<th>Quantity Ordered</th>
+									<th>Total Sales</th>
+								</tr>
+							</thead>
+							<tbody>
+								{selectedCustomerSummary.product_summary.map((prod, index) => {
+									return (
+										<tr key={`${prod.product}_${index}`}>
+											<td>{prod.product}</td>
+											<td>{formatNumber(prod.total_quantity)}</td>
+											<td>{formatToPeso(prod.total_cost)}</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			)}
+
 			{/* 🔹 Sales Details Modal */}
 			{showModal && selectedSale && (
 				<div className="custom-modal-backdrop">

@@ -66,113 +66,241 @@ class SalesOrderController extends Controller
         return response()->json($order);
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'customer_id'   => 'required|exists:customers,id',
-            'location'      => 'required|string',
-            'date'          => 'required|date',
-            'delivery_date' => 'required|date',
-            'order_type'    => 'required|string',
-            'products'      => 'required|array|min:1',
-            'products.*.product_id' => 'required|integer|exists:inventories,id',
-            'products.*.quantity'   => 'required|integer|min:1',
-            'amount'        => 'required|numeric',
-        ]);
+    // * V1
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'customer_id'   => 'required|exists:customers,id',
+    //         'location'      => 'required|string',
+    //         'date'          => 'required|date',
+    //         'delivery_date' => 'required|date',
+    //         'order_type'    => 'required|string',
+    //         'products'      => 'required|array|min:1',
+    //         'products.*.product_id' => 'required|integer|exists:inventories,id',
+    //         'products.*.quantity'   => 'required|integer|min:1',
+    //         'amount'        => 'required|numeric',
+    //     ]);
 
-        $employeeId = $request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN';
+    //     $employeeId = $request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN';
         
-        $affectedInventoryIds = [];
+    //     $affectedInventoryIds = [];
 
-        DB::beginTransaction();
+    //     DB::beginTransaction();
 
-        try {
-            $quantities = [];
-            $productsList = [];
+    //     try {
+    //         $quantities = [];
+    //         $productsList = [];
 
-            foreach ($request->products as $p) {
-                $inventory = DB::table('inventories')->find($p['product_id']);
+    //         foreach ($request->products as $p) {
+    //             $inventory = DB::table('inventories')->find($p['product_id']);
 
-                if ($inventory) {
-                    $productName = $inventory->item;
-                    $qty = intval($p['quantity']);
+    //             if ($inventory) {
+    //                 $productName = $inventory->item;
+    //                 $qty = intval($p['quantity']);
 
-                    if ($qty > 0) {
-                        $quantities[$productName] = $qty; 
-                        $productsList[] = $productName;
-                    }
+    //                 if ($qty > 0) {
+    //                     $quantities[$productName] = $qty; 
+    //                     $productsList[] = $productName;
+    //                 }
+    //             }
+    //         }
+
+    //         $productsJson = json_encode($productsList);
+
+    //         $order = SalesOrder::create([
+    //             'customer_id'   => $request->customer_id,
+    //             'location'      => $request->location,
+    //             'date'          => $request->date,
+    //             'delivery_date' => $request->delivery_date,
+    //             'order_type'    => $request->order_type,
+    //             'products'      => $productsJson,
+    //             'amount'        => $request->amount,
+    //             'quantities'    => $quantities, // JSONB or array
+    //             'status'        => 'Pending',
+    //         ]);
+
+    //         // 🔹 Deduct inventory & log activity
+    //         foreach ($quantities as $product => $casesOrdered) {
+    //             if ($casesOrdered <= 0) continue;
+            
+    //             $inventory = DB::table('inventories')->where('item', $product)->first();
+    //             if (!$inventory) continue;
+            
+    //             $pcsPerUnit = $inventory->pcs_per_unit ?? 1;
+    //             $pcsOrdered = $casesOrdered * $pcsPerUnit;
+            
+    //             // Compute previous quantities before deduction
+    //             $previousQuantity = $inventory->quantity_pcs;
+    //             $newQuantityPcs = max(0, $inventory->quantity_pcs - $pcsOrdered);
+    //             $newQuantity = max(0, $inventory->quantity - $casesOrdered);
+            
+    //             DB::table('inventories')->where('id', $inventory->id)->update([
+    //                 'quantity'     => $newQuantity,
+    //                 'quantity_pcs' => $newQuantityPcs,
+    //                 'updated_at'   => now(),
+    //             ]);
+                
+    //             // Track for notification check
+    //             $affectedInventoryIds[] = $inventory->id;
+            
+    //             // Log inventory deduction with previous and remaining quantities
+    //             \App\Models\InventoryActivityLog::create([
+    //                 'employee_id'       => $employeeId,
+    //                 'module'            => 'Sales Order',
+    //                 'type'              => 'Finished Goods',
+    //                 'item_name'         => $product,
+    //                 'quantity'          => $pcsOrdered,
+    //                 'previous_quantity' => $previousQuantity,
+    //                 'remaining_quantity'=> $newQuantityPcs,
+    //                 'processed_at'      => now(),
+    //             ]);
+    //         }
+
+            
+    //         DB::commit();
+    //         $this->checkAndUpdateNotifications($affectedInventoryIds, []);
+
+    //         return response()->json([
+    //             'message' => 'Sales order created and inventory updated successfully.',
+    //             'data'    => $order
+    //         ], 201);
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         \Log::error('Sales Order Creation Error: ' . $e->getMessage());
+
+    //         return response()->json([
+    //             'error' => 'Failed to create sales order: ' . $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    // * v2
+
+    public function store(Request $request)
+{
+    $request->validate([
+        'customer_id'   => 'required|exists:customers,id',
+        'location'      => 'required|string',
+        'date'          => 'required|date',
+        'delivery_date' => 'required|date',
+        'order_type'    => 'required|string',
+        'products'      => 'required|array|min:1',
+        'products.*.product_id' => 'required|integer|exists:inventories,id',
+        'products.*.quantity'   => 'required|integer|min:1',
+        'amount'        => 'required|numeric',
+        'employee_id'   => 'required|string',
+    ]);
+
+    $employeeId = $request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN';
+    
+    $affectedInventoryIds = [];
+
+    DB::beginTransaction();
+
+    try {
+        $quantities = [];
+        $productsList = [];
+
+        foreach ($request->products as $p) {
+            $inventory = DB::table('inventories')->find($p['product_id']);
+
+            if ($inventory) {
+                $productName = $inventory->item;
+                $qty = intval($p['quantity']);
+
+                if ($qty > 0) {
+                    $quantities[$productName] = $qty; 
+                    $productsList[] = $productName;
                 }
             }
-
-            $productsJson = json_encode($productsList);
-
-            $order = SalesOrder::create([
-                'customer_id'   => $request->customer_id,
-                'location'      => $request->location,
-                'date'          => $request->date,
-                'delivery_date' => $request->delivery_date,
-                'order_type'    => $request->order_type,
-                'products'      => $productsJson,
-                'amount'        => $request->amount,
-                'quantities'    => $quantities, // JSONB or array
-                'status'        => 'Pending',
-            ]);
-
-            // 🔹 Deduct inventory & log activity
-            foreach ($quantities as $product => $casesOrdered) {
-                if ($casesOrdered <= 0) continue;
-            
-                $inventory = DB::table('inventories')->where('item', $product)->first();
-                if (!$inventory) continue;
-            
-                $pcsPerUnit = $inventory->pcs_per_unit ?? 1;
-                $pcsOrdered = $casesOrdered * $pcsPerUnit;
-            
-                // Compute previous quantities before deduction
-                $previousQuantity = $inventory->quantity_pcs;
-                $newQuantityPcs = max(0, $inventory->quantity_pcs - $pcsOrdered);
-                $newQuantity = max(0, $inventory->quantity - $casesOrdered);
-            
-                DB::table('inventories')->where('id', $inventory->id)->update([
-                    'quantity'     => $newQuantity,
-                    'quantity_pcs' => $newQuantityPcs,
-                    'updated_at'   => now(),
-                ]);
-                
-                // Track for notification check
-                $affectedInventoryIds[] = $inventory->id;
-            
-                // Log inventory deduction with previous and remaining quantities
-                \App\Models\InventoryActivityLog::create([
-                    'employee_id'       => $employeeId,
-                    'module'            => 'Sales Order',
-                    'type'              => 'Finished Goods',
-                    'item_name'         => $product,
-                    'quantity'          => $pcsOrdered,
-                    'previous_quantity' => $previousQuantity,
-                    'remaining_quantity'=> $newQuantityPcs,
-                    'processed_at'      => now(),
-                ]);
-            }
-
-            
-            DB::commit();
-            $this->checkAndUpdateNotifications($affectedInventoryIds, []);
-
-            return response()->json([
-                'message' => 'Sales order created and inventory updated successfully.',
-                'data'    => $order
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Sales Order Creation Error: ' . $e->getMessage());
-
-            return response()->json([
-                'error' => 'Failed to create sales order: ' . $e->getMessage()
-            ], 500);
         }
+
+        $productsJson = json_encode($productsList);
+
+        $order = SalesOrder::create([
+            'customer_id'   => $request->customer_id,
+            'location'      => $request->location,
+            'date'          => $request->date,
+            'delivery_date' => $request->delivery_date,
+            'order_type'    => $request->order_type,
+            'products'      => $productsJson,
+            'amount'        => $request->amount,
+            'quantities'    => $quantities,
+            'status'        => 'Pending',
+        ]);
+
+        // 🔹 Deduct inventory & log activity
+        foreach ($quantities as $product => $casesOrdered) {
+            if ($casesOrdered <= 0) continue;
+        
+            $inventory = DB::table('inventories')->where('item', $product)->first();
+            if (!$inventory) continue;
+        
+            $pcsPerUnit = $inventory->pcs_per_unit ?? 1;
+            $pcsOrdered = $casesOrdered * $pcsPerUnit;
+        
+            $previousQuantity = $inventory->quantity_pcs;
+            $newQuantityPcs = max(0, $inventory->quantity_pcs - $pcsOrdered);
+            $newQuantity = max(0, $inventory->quantity - $casesOrdered);
+        
+            DB::table('inventories')->where('id', $inventory->id)->update([
+                'quantity'     => $newQuantity,
+                'quantity_pcs' => $newQuantityPcs,
+                'updated_at'   => now(),
+            ]);
+            
+            $affectedInventoryIds[] = $inventory->id;
+        
+            \App\Models\InventoryActivityLog::create([
+                'employee_id'       => $employeeId,
+                'module'            => 'Sales Order',
+                'type'              => 'Finished Goods',
+                'item_name'         => $product,
+                'quantity'          => $pcsOrdered,
+                'previous_quantity' => $previousQuantity,
+                'remaining_quantity'=> $newQuantityPcs,
+                'processed_at'      => now(),
+            ]);
+        }
+
+        // ========================================
+        // CREATE AUDIT LOG
+        // ========================================
+        $employeeIdString = (string) $request->employee_id;
+        $creatorId = \App\Models\User::where('employeeID', $employeeIdString)->value('id');
+
+        if (!$creatorId) {
+            DB::rollBack();
+            return response()->json(['error' => 'Invalid employee ID'], 422);
+        }
+
+        \App\Models\AuditLog::create([
+            'module' => 'Sales Order',
+            'record_id' => $order->id,
+            'action' => 'Created',
+            'status' => 'Pending',
+            'created_by' => $creatorId,
+            'performed_by' => $creatorId,
+        ]);
+
+        DB::commit();
+        $this->checkAndUpdateNotifications($affectedInventoryIds, []);
+
+        return response()->json([
+            'message' => 'Sales order created and inventory updated successfully.',
+            'data'    => $order
+        ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Sales Order Creation Error: ' . $e->getMessage());
+
+        return response()->json([
+            'error' => 'Failed to create sales order: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     
     private function checkAndUpdateNotifications(array $finishedGoodsIds, array $rawMaterialIds)
@@ -385,18 +513,89 @@ public function updateStatus(Request $request, $id)
         'order' => $order,
     ]);
 }
+
+// * V1
+// public function markDelivered(Request $request, $id)
+// {
+//     $request->validate([
+//         'date_delivered' => 'required|date',
+//     ]);
+
+//     $order = SalesOrder::findOrFail($id);
+//     $order->status = 'Delivered';
+//     $order->date_delivered = $request->date_delivered;
+//     $order->save();
+
+//     return response()->json(['message' => 'Order marked as Delivered successfully', 'data' => $order]);
+// }
+
+// *v2
 public function markDelivered(Request $request, $id)
 {
     $request->validate([
         'date_delivered' => 'required|date',
+        'employee_id'    => 'string',
     ]);
 
-    $order = SalesOrder::findOrFail($id);
-    $order->status = 'Delivered';
-    $order->date_delivered = $request->date_delivered;
-    $order->save();
+    DB::beginTransaction();
 
-    return response()->json(['message' => 'Order marked as Delivered successfully', 'data' => $order]);
+    try {
+        $order = SalesOrder::findOrFail($id);
+        $order->status = 'Delivered';
+        $order->date_delivered = $request->date_delivered;
+        $order->save();
+
+        // ========================================
+        // AUDIT LOG
+        // ========================================
+        $employeeIdString = (string) $request->employee_id;
+        $performerId = \App\Models\User::where('employeeID', $employeeIdString)->value('id');
+
+        if (!$performerId) {
+            DB::rollBack();
+            return response()->json(['error' => 'Invalid employee ID'], 422);
+        }
+
+        // Find and UPDATE the original audit log's status
+        $originalAuditLog = \App\Models\AuditLog::where('module', 'Sales Order')
+                                ->where('record_id', $order->id)
+                                ->where('action', 'Created')
+                                ->orderBy('created_at', 'asc')
+                                ->first();
+
+        if (!$originalAuditLog) {
+            DB::rollBack();
+            return response()->json(['error' => 'Sales order audit log not found'], 422);
+        }
+
+        // UPDATE the original audit log's status
+        $originalAuditLog->update([
+            'status' => 'Delivered',
+        ]);
+
+        // CREATE a NEW audit log for the Delivered action
+        \App\Models\AuditLog::create([
+            'module' => 'Sales Order',
+            'record_id' => $order->id,
+            'action' => 'Delivered',
+            'status' => 'Delivered',
+            'created_by' => $originalAuditLog->created_by, 
+            'performed_by' => $performerId,  
+        ]);
+
+        DB::commit();
+
+        return response()->json([
+            'message' => 'Order marked as Delivered successfully',
+            'data' => $order
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'error' => $e->getMessage()
+        ], 500);
+    }
 }
 
     // ----- Delete -----
