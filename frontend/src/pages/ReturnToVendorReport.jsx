@@ -184,7 +184,7 @@ function ReturnToVendorReport() {
 		try {
 			setLoading(true);
 			const res = await axios.get("http://localhost:8000/api/return-to-vendor");
-			setReturns(res.data || []);
+			setReturns(res.data.returnToVendor || []);
 			const customersRes = await axios.get(
 				"http://localhost:8000/api/customers"
 			);

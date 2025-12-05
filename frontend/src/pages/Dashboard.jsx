@@ -117,6 +117,7 @@ function Dashboard() {
 
 	// Sidebar & dropdown states
 	const [overviewOpen, setOverviewOpen] = useState(false);
+	const [loading, setLoading] = useState(false);
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [showDropdown, setShowDropdown] = useState(false);
 	const [reportsOpen, setReportsOpen] = useState(false);
@@ -173,7 +174,8 @@ function Dashboard() {
 			const rtvRes = await axios.get(
 				"http://localhost:8000/api/return-to-vendor"
 			);
-			const pendingRtv = (rtvRes.data || []).filter(
+
+			const pendingRtv = (rtvRes.data.returnToVendor || []).filter(
 				(item) => item.status === "Pending"
 			);
 			setRtvCount(pendingRtv.length);

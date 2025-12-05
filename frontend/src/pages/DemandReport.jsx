@@ -120,6 +120,7 @@ function DemandReport() {
 	const [timeRange, setTimeRange] = useState("Monthly"); // 👈 new dropdown state
 	const [showDropdown, setShowDropdown] = useState(false); // 👈 added to handle profile dropdown
 	const [reportsOpen, setReportsOpen] = useState(false);
+	const [loading, setLoading] = useState(false);
 
 	const [stockNotifications, setStockNotifications] = useState([]);
 	const [showNotifDropdown, setShowNotifDropdown] = useState(false);

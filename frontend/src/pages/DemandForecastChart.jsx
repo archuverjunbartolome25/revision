@@ -27,6 +27,14 @@ ChartJS.register(
 	ChartDataLabels
 );
 
+const safeAlias = (str) => {
+	return str
+		.toLowerCase()
+		.replace(/\s+/g, "_") // Replace spaces with underscore
+		.replace(/[()]/g, "_") // Replace parentheses with underscore
+		.replace(/[^a-z0-9_]/g, ""); // Remove anything that's not alphanumeric or underscore
+};
+
 const DemandForecastChart = () => {
 	const [selectedDate, setSelectedDate] = useState(new Date());
 	const [forecast, setForecast] = useState({});
@@ -78,6 +86,7 @@ const DemandForecastChart = () => {
 	}, []);
 
 	// Fetch historical sales data
+	// Update the useEffect for historical sales data
 	useEffect(() => {
 		if (!selectedProduct) return;
 
@@ -90,16 +99,22 @@ const DemandForecastChart = () => {
 				const salesData = res.data.sales || [];
 				const products = res.data.products || [];
 
-				// Transform data into format: { product: [{date, qty}] }
 				const transformed = {};
 
 				products.forEach((product) => {
-					transformed[product] = salesData.map((item) => ({
-						date: item.date,
-						qty: item[`qty_${product}`] || 0,
-					}));
+					const productAlias = safeAlias(product);
+					transformed[product] = salesData.map((item) => {
+						const qtyKey = `qty_${productAlias}`;
+						const qtyValue = item[qtyKey];
+
+						return {
+							date: item.date,
+							qty: qtyValue !== null && qtyValue !== undefined ? qtyValue : 0,
+						};
+					});
 				});
 
+				console.log("Transformed Historical Data:", transformed);
 				setHistorical(transformed);
 			})
 			.catch((err) => console.error("Historical sales error:", err))

@@ -15,6 +15,8 @@ class PurchaseOrderItemController extends Controller
     {
         $validated = $request->validate([
             'purchase_order_id' => 'required|integer|exists:purchase_orders,id',
+            'unit_cost' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
             'item_name'         => 'required|string|max:255',
             'item_type'         => 'required|in:raw,finished',
             'quantity'          => 'required|integer|min:1',

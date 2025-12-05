@@ -14,11 +14,7 @@ class ProductionOutput extends Model
     protected $fillable = [
         'employee_id',
         'product_name',
-        'quantity',            
-        'qty_350ml',
-        'qty_500ml',
-        'qty_1l',
-        'qty_6l',
+        'quantity',     
         'quantity_pcs',       
         'materials_needed',    
         'selected_suppliers', 

@@ -959,6 +959,8 @@ function Suppliers() {
 										setSavingOffer(true);
 										await ensureCsrf();
 
+										console.log(newOffer);
+
 										// Post to backend
 										const res = await api.post(
 											`/api/suppliers/${selectedSupplier.id}/offers`,

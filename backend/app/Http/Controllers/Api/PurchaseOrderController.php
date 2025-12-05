@@ -234,6 +234,8 @@ class PurchaseOrderController extends Controller
     //     }
     // }
 
+
+    // *v2
     public function receiveItems(Request $request, $id)
     {
         $request->validate([
@@ -340,16 +342,30 @@ class PurchaseOrderController extends Controller
 
             // Determine the new status based on received quantities
             $order->load('items');
-            $totalOrdered  = $order->items->sum('quantity');
-            $totalReceived = $order->items->sum('received_quantity');
 
-            if ($totalReceived === 0) {
+            $allReceived = $order->items->every(function ($i) {
+                return ($i->received_quantity ?? 0) >= ($i->quantity ?? 0);
+            });
+
+            if ($order->items->sum('received_quantity') === 0) {
                 $order->status = 'Pending';
-            } elseif ($totalReceived > 0 && $totalReceived < $totalOrdered) {
-                $order->status = 'Partially Received';
-            } elseif ($totalReceived === $totalOrdered) {
+            } elseif ($allReceived) {
                 $order->status = 'Fully Received';
+            } else {
+                $order->status = 'Partially Received';
             }
+            // $order->load('items');
+
+            // $totalOrdered  = $order->items->sum('quantity');
+            // $totalReceived = $order->items->sum('received_quantity');
+            
+            // if ($totalReceived === 0) {
+            //     $order->status = 'Pending';
+            // } elseif ($totalReceived > 0 && $totalReceived < $totalOrdered) {
+            //     $order->status = 'Partially Received';
+            // } elseif ($totalReceived === $totalOrdered) {
+            //     $order->status = 'Fully Received';
+            // }
 
             $order->save();
 
@@ -374,6 +390,151 @@ class PurchaseOrderController extends Controller
             ], 500);
         }
     }
+
+// *v3
+    // public function receiveItems(Request $request, $id)
+    // {
+    //     $request->validate([
+    //         'item_id'   => 'required|integer',
+    //         'quantity'  => 'required|integer|min:1',
+    //         'unit_cost' => 'required|numeric|min:0',
+    //         'image'     => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+    //     ]);
+        
+   
+    //     $affectedRawMatIds = [];
+    //     $affectedInventoryIds = [];
+
+    //     DB::beginTransaction();
+
+    //     try {
+    //         $order = PurchaseOrder::with('items')->findOrFail($id);
+        
+    //         // Ensure the item exists in this purchase order
+    //         $itemTemplate = $order->items()->where('id', $request->item_id)->first();
+    //         if (!$itemTemplate) {
+    //             return response()->json([
+    //                 'error' => 'The specified item does not exist in this purchase order.'
+    //             ], 422);
+    //         }
+    
+    //         $receivedQty = (int) $request->quantity;
+    //         $remaining = ($itemTemplate->quantity ?? 0) - ($itemTemplate->received_quantity ?? 0);
+
+    //         if ($receivedQty > $remaining) {
+    //             DB::rollBack();
+    //             return response()->json([
+    //                 'error' => "Cannot receive more than remaining quantity ({$remaining})."
+    //             ], 422);
+    //         }
+
+    //         // --- Create a new PurchaseOrderItem for this received batch ---
+    //         $unitCost = (float) $request->unit_cost;
+          
+
+    //         $newItem = PurchaseOrderItem::create([
+    //             'purchase_order_id' => $order->id,
+    //             'item_name'         => $itemTemplate->item_name,
+    //             'quantity'          => $receivedQty,
+    //             'received_quantity' => $receivedQty,
+    //             'unit_cost'         => $unitCost,
+    //             'total_amount'      => $unitCost * $receivedQty,
+    //         ]);
+
+
+    //         // --- Handle receipt image ---
+    //         $imagePath = null;
+    //         $imageMime = null;
+    //         if ($request->hasFile('image')) {
+    //             $file = $request->file('image');
+    //             $imageMime = $file->getMimeType();
+    //             $imagePath = $file->store('receipts', 'public');
+    //         }
+
+    //         $receiptId = DB::table('purchase_receipts')->insertGetId([
+    //             'purchase_order_id'      => $order->id,
+    //             'purchase_order_item_id' => $newItem->id,
+    //             'po_number'              => $order->po_number,
+    //             'item_name'              => $newItem->item_name,
+    //             'quantity_received'      => $receivedQty,
+    //             'received_date'          => now(),
+    //             'image_path'             => $imagePath,
+    //             'image_mime'             => $imageMime,
+    //             'created_at'             => now(),
+    //             'updated_at'             => now(),
+    //         ]);
+
+    //         $employeeId = $order->employee_id ?? ($request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN');
+
+    //         // --- Update InventoryRawmat ---
+    //         $rawMat = InventoryRawmat::whereRaw('LOWER(item) = ?', [strtolower($itemTemplate->item_name)])->first();
+    //         if ($rawMat) {
+    //             $conversion = $rawMat->conversion ?? 1;
+    //             $previousPieces = $rawMat->quantity_pieces;
+    //             $rawMat->quantity_pieces += $receivedQty;
+    //             $rawMat->quantity = floor($rawMat->quantity_pieces / $conversion);
+    //             $rawMat->save();
+
+    //             $affectedRawMatIds[] = $rawMat->id;
+
+    //             \App\Models\InventoryActivityLog::create([
+    //                 'employee_id' => $employeeId,
+    //                 'module' => 'Purchase Order',
+    //                 'type' => 'Raw Materials',
+    //                 'item_name' => $rawMat->item,
+    //                 'quantity' => $receivedQty,
+    //                 'previous_quantity' => $previousPieces,
+    //                 'remaining_quantity' => $rawMat->quantity_pieces,
+    //                 'processed_at' => now(),
+    //             ]);
+    //         }
+
+    //         // --- Update PurchaseOrder quantities ---
+    //         $order->quantity_pieces = ($order->quantity_pieces ?? 0) + $receivedQty;
+
+    //         if ($rawMat) {
+    //             $order->quantity = floor($order->quantity_pieces / ($rawMat->conversion ?? 1));
+    //         }
+
+    //         // --- Update PurchaseOrder status ---
+    //         $allItems = $order->items()->get();
+    //         $allFullyReceived = $allItems->every(function ($i) {
+    //             return ($i->received_quantity ?? 0) >= ($i->quantity ?? 0);
+    //         });
+
+    //         if ($allItems->sum('received_quantity') === 0) {
+    //             $order->status = 'Pending';
+    //         } elseif ($allFullyReceived) {
+    //             $order->status = 'Fully Received';
+    //         } else {
+    //             $order->status = 'Partially Received';
+    //         }
+
+    //         $order->save();
+
+    //         DB::commit();
+
+    //         $this->checkAndUpdateNotifications($affectedInventoryIds, $affectedRawMatIds);
+
+    //         $receipt = DB::table('purchase_receipts')->where('id', $receiptId)->first();
+
+    //         return response()->json([
+    //             'message' => 'Items received and logged successfully.',
+    //             'order'   => $order,
+    //             'receipt' => $receipt,
+    //             'new_item'=> $newItem,
+    //         ]);
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         \Log::error('receiveItems error: ' . $e->getMessage());
+    //         return response()->json([
+    //             'error'   => 'Server error while receiving items.',
+    //             'details' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
 
     public function markAsComplete($id)
     {

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Inventory;
 use App\Models\InventoryRawmat;
+use App\Models\Supplier;
+use App\Models\SupplierOffer;
 use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
@@ -198,22 +200,22 @@ public function deduct(Request $request)
             'data' => $item
         ]);
     }
-    public function updateMaterials(Request $request, $id)
-    {
-        $inventory = Inventory::findOrFail($id);
+    // public function updateMaterials(Request $request, $id)
+    // {
+    //     $inventory = Inventory::findOrFail($id);
 
-        // Get materials array from request
-        $materials = $request->input('materials_needed', []);
+    //     // Get materials array from request
+    //     $materials = $request->input('materials_needed', []);
 
-        // Save as JSON to the correct column
-        $inventory->materials_needed = json_encode($materials);
-        $inventory->save();
+    //     // Save as JSON to the correct column
+    //     $inventory->materials_needed = json_encode($materials);
+    //     $inventory->save();
 
-        return response()->json([
-            'message' => 'Materials updated successfully',
-            'data' => $inventory
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Materials updated successfully',
+    //         'data' => $inventory
+    //     ]);
+    // }
     public function finishedGoods()
     {
         // Return all items in inventories as finished goods
@@ -310,33 +312,28 @@ public function deduct(Request $request)
     public function getAllFinishedGoodsWithNeededMaterials()
     {
         $inventories = Inventory::all()->map(function($item) {
-            // Decode materials_needed
             $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
-            
-            // selected_materials is already an array due to casting in the model
             $selectedMaterials = $item->selected_materials ?? [];
-            
             $transformedMaterials = [];
             
-            foreach ($selectedMaterials as $materialName => $supplierId) {
-                // Find the raw material by name
-                $rawMaterial = DB::table('inventory_rawmats')
-                    ->where('item', $materialName)
+            foreach ($selectedMaterials as $materialName => $supplierOfferId) {
+                // Get the supplier offer directly by ID
+                $supplierOffer = DB::table('supplier_offers')
+                    ->where('id', $supplierOfferId)
                     ->first();
                 
-                if ($rawMaterial) {
-                    // Find the supplier offer for this specific raw material and supplier combination
-                    $supplierOffer = DB::table('supplier_offers')
-                        ->where('rawmat_id', $rawMaterial->id)
-                        ->where('supplier_id', $supplierId)
+                if ($supplierOffer) {
+                    // Get raw material details
+                    $rawMaterial = DB::table('inventory_rawmats')
+                        ->where('id', $supplierOffer->rawmat_id)
                         ->first();
                     
-                    if ($supplierOffer) {
-                        // Get supplier details
-                        $supplier = DB::table('suppliers')
-                            ->where('id', $supplierId)
-                            ->first();
-                        
+                    // Get supplier details
+                    $supplier = DB::table('suppliers')
+                        ->where('id', $supplierOffer->supplier_id)
+                        ->first();
+                    
+                    if ($rawMaterial && $supplier) {
                         $transformedMaterials[] = [
                             'raw_material_id' => $rawMaterial->id,
                             'raw_material_name' => $rawMaterial->item,
@@ -351,11 +348,65 @@ public function deduct(Request $request)
             }
             
             $item->selected_materials = $transformedMaterials;
-            
             return $item;
         });
     
         return response()->json($inventories);
+    }
+
+
+    public function updateMaterials(Request $request, $id)
+    {
+        $inventory = Inventory::findOrFail($id);
+    
+        // Update materials_needed if provided
+        if ($request->has('materials_needed')) {
+            $inventory->materials_needed = json_encode($request->input('materials_needed'));
+        }
+    
+        // Update selected_materials
+        if ($request->has('selected_materials')) {
+            $selectedMaterialsInput = $request->input('selected_materials');
+            if (!is_array($selectedMaterialsInput)) {
+                $selectedMaterialsInput = [$selectedMaterialsInput]; // wrap single object
+            }
+    
+            $finalSelectedMaterials = [];
+    
+            foreach ($selectedMaterialsInput as $material) {
+                if (!isset($material['name'], $material['supplier'])) continue;
+    
+                // 1. Get rawmats id
+                $rawMat = InventoryRawmat::where('item', $material['name'])->first();
+                if (!$rawMat) continue;
+    
+                // 2. Get supplier id
+                $supplier = Supplier::where('name', $material['supplier'])->first();
+                if (!$supplier) continue;
+    
+                // 3. Find supplier_offer where both match
+                $supplierOffer = SupplierOffer::where('rawmat_id', $rawMat->id)
+                    ->where('supplier_id', $supplier->id)
+                    ->first();
+    
+                if (!$supplierOffer) continue;
+    
+                // 4. Assign Rawmats_name : supplier_offer_id
+                $finalSelectedMaterials[$material['name']] = $supplierOffer->id;
+            }
+    
+            // Save JSON string
+            // $inventory->selected_materials = json_encode($finalSelectedMaterials, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $inventory->selected_materials = $finalSelectedMaterials;
+        }
+    
+        $inventory->save();
+        
+    
+        return response()->json([
+            'message' => 'Materials updated successfully',
+            'data' => $inventory
+        ]);
     }
 }
 

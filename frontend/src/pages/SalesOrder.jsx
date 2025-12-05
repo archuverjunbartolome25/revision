@@ -37,7 +37,9 @@ function SalesOrder() {
 	const localToday = `${yyyy}-${mm}-${dd}`;
 
 	const [isDeliveredModalOpen, setIsDeliveredModalOpen] = useState(false);
-	const [deliveryDate, setDeliveryDate] = useState("");
+	const [deliveryDate, setDeliveryDate] = useState(
+		today.toISOString().split("T")[0]
+	);
 	const roles = {
 		dashboard: [
 			"Inventory Custodian",

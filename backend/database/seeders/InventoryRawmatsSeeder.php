@@ -46,19 +46,6 @@ class InventoryRawmatsSeeder extends Seeder
             ],
             [
                 'id' => 3,
-                'item' => 'Plastic Bottle (500ml)',
-                'unit' => 'pieces',
-                'quantity' => 250000,
-                'conversion' => 1,
-                'quantity_pieces' => 250000,
-                'low_stock_alert' => 50000,
-                'created_at' => $now,
-                'updated_at' => $now,
-                'unit_cost' => 2.35,
-                'supplier_id' => 2, // Filpet (same item, different supplier)
-            ],
-            [
-                'id' => 4,
                 'item' => 'Plastic Bottle (1L)',
                 'unit' => 'pieces',
                 'quantity' => 150000,
@@ -71,7 +58,7 @@ class InventoryRawmatsSeeder extends Seeder
                 'supplier_id' => 1, // Mc Bride
             ],
             [
-                'id' => 5,
+                'id' => 4,
                 'item' => 'Plastic Gallon (6L)',
                 'unit' => 'pieces',
                 'quantity' => 100000,
@@ -85,7 +72,7 @@ class InventoryRawmatsSeeder extends Seeder
             ],
             // Caps
             [
-                'id' => 6,
+                'id' => 5,
                 'item' => 'Blue Plastic Cap',
                 'unit' => 'pieces',
                 'quantity' => 300000,
@@ -98,20 +85,7 @@ class InventoryRawmatsSeeder extends Seeder
                 'supplier_id' => 1, // Mc Bride
             ],
             [
-                'id' => 7,
-                'item' => 'Blue Plastic Cap',
-                'unit' => 'pieces',
-                'quantity' => 400000,
-                'conversion' => 1,
-                'quantity_pieces' => 400000,
-                'low_stock_alert' => 100000,
-                'created_at' => $now,
-                'updated_at' => $now,
-                'unit_cost' => 0.49,
-                'supplier_id' => 2, // Filpet (same item, different supplier)
-            ],
-            [
-                'id' => 8,
+                'id' => 6,
                 'item' => 'Blue Plastic Cap (6L)',
                 'unit' => 'pieces',
                 'quantity' => 150000,
@@ -125,7 +99,7 @@ class InventoryRawmatsSeeder extends Seeder
             ],
             // Labels
             [
-                'id' => 9,
+                'id' => 7,
                 'item' => 'Label',
                 'unit' => 'rolls',
                 'quantity' => 50,
@@ -137,22 +111,9 @@ class InventoryRawmatsSeeder extends Seeder
                 'unit_cost' => 1.00,
                 'supplier_id' => 3, // Royalseal
             ],
-            [
-                'id' => 10,
-                'item' => 'Label',
-                'unit' => 'rolls',
-                'quantity' => 40,
-                'conversion' => 10000,
-                'quantity_pieces' => 400000,
-                'low_stock_alert' => 20,
-                'created_at' => $now,
-                'updated_at' => $now,
-                'unit_cost' => 2.00,
-                'supplier_id' => 4, // Shrinkpack (same item, different supplier)
-            ],
             // Films
             [
-                'id' => 11,
+                'id' => 8,
                 'item' => 'Stretchfilm',
                 'unit' => 'pieces',
                 'quantity' => 150,
@@ -161,11 +122,11 @@ class InventoryRawmatsSeeder extends Seeder
                 'low_stock_alert' => 50,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'unit_cost' => 320.00,
-                'supplier_id' => 5, // Synergy
+                'unit_cost' =>320.00,
+                'supplier_id' => 6, // Polyflex
             ],
             [
-                'id' => 12,
+                'id' => 9,
                 'item' => 'Shrinkfilm',
                 'unit' => 'pieces',
                 'quantity' => 120,
@@ -174,7 +135,7 @@ class InventoryRawmatsSeeder extends Seeder
                 'low_stock_alert' => 30,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'unit_cost' => 2337.00,
+                'unit_cost' => 222.00,
                 'supplier_id' => 6, // Polyflex
             ],
         ]);
