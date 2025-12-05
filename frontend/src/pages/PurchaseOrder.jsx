@@ -426,7 +426,10 @@ function PurchaseOrder() {
 			}
 
 			await ensureCsrf();
-			const response = await api.post("/api/purchase-orders", formData);
+			const response = await api.post("/api/purchase-orders", {
+				...formData,
+				employee_id: localStorage.getItem("employeeID"),
+			});
 			const poId = response.data.id;
 
 			for (let item of validItems) {
@@ -437,6 +440,7 @@ function PurchaseOrder() {
 					quantity: item.quantity,
 					unit_cost: item.unit_price,
 					total_amount: item.unit_price * item.quantity,
+					employee_id: localStorage.getItem("employeeID"),
 				});
 			}
 
@@ -527,7 +531,8 @@ function PurchaseOrder() {
 
 			// 🔥 Backend no longer accepts items or quantities
 			const response = await api.post(
-				`/api/purchase-orders/${selectedOrder.id}/mark-as-complete`
+				`/api/purchase-orders/${selectedOrder.id}/mark-as-complete`,
+				{ employee_id: localStorage.getItem("employeeID") }
 			);
 
 			console.log(response);

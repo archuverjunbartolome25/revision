@@ -25,6 +25,17 @@ use App\Http\Controllers\DisposalProductController;
 use App\Http\Controllers\DisposalRawMatController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\InventoryNotificationController;
+use App\Http\Controllers\Api\AuditLogController;
+
+
+Route::prefix('audit-logs')->group(function () {
+    Route::get('/', [AuditLogController::class, 'index']);
+    Route::get('/by-record', [AuditLogController::class, 'getByRecord']);
+    Route::get('/module/{module}', [AuditLogController::class, 'getByModule']);
+    Route::get('/{id}', [AuditLogController::class, 'show']);
+    Route::get('/creator/{userId}', [AuditLogController::class, 'getByCreator']);
+    Route::get('/performer/{userId}', [AuditLogController::class, 'getByPerformer']);
+});
 
 // ============================
 // AUTHENTICATION ROUTES
@@ -258,6 +269,10 @@ Route::post('inventories/restore/{id}', [InventoryController::class, 'restore'])
 
 // *  NEW ENDPOINTS
 Route::get('/finished-goods', [InventoryController::class, 'getAllFinishedGoods']);
+
+
+Route::get('reports/stat-analysis', [ReportController::class, 'topCustomers']);
+
 
 
 // * NOTIFICATION ROUTES

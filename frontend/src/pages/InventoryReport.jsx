@@ -139,6 +139,7 @@ function InventoryReport() {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [logCurrentPage, setLogCurrentPage] = useState(1);
+	const [auditLogCurrentPage, setAuditLogCurrentPage] = useState(1);
 	const logItemsPerPage = 8;
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 6;
@@ -300,12 +301,17 @@ function InventoryReport() {
 	const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
 	const [activityLogs, setActivityLogs] = useState([]);
+	const [auditLogs, setAuditLogs] = useState([]);
 
 	// Add filter states at the top
 	const [logSearch, setLogSearch] = useState("");
+	const [auditLogSearch, setAuditLogSearchSearch] = useState("");
 	const [logType, setLogType] = useState("All"); // Finished Goods / Raw Materials / All
+	const [auditLogType, setAuditLogType] = useState("All"); // Finished Goods / Raw Materials / All
 	const [logProcess, setLogProcess] = useState("All");
+	const [auditLogProcess, setAuditLogProcess] = useState("All");
 	const [logDate, setLogDate] = useState(""); // yyyy-mm-dd format
+	const [auditLogDate, setAuditLogDate] = useState(""); // yyyy-mm-dd format
 
 	const processMap = {
 		sales_order: "Sales Order",
@@ -316,7 +322,9 @@ function InventoryReport() {
 
 	// Apply filters
 	const filteredLogs = activityLogs.filter((log) => {
-		const logDateStr = new Date(log.processed_at).toISOString().split("T")[0];
+		const logDateStr = new Date(log.processed_at?.replace(" ", "T"))
+			.toISOString()
+			.split("T")[0];
 
 		// Filter by search (item name or employee)
 		const matchesSearch =
@@ -349,12 +357,51 @@ function InventoryReport() {
 	);
 	const logTotalPages = Math.ceil(filteredLogs.length / logItemsPerPage);
 
+	const filteredAuditLogs = activityLogs.filter((log) => {
+		const logDateStr = new Date(log.processed_at?.replace(" ", "T"))
+			.toISOString()
+			.split("T")[0];
+
+		// Filter by search (item name or employee)
+		const matchesSearch =
+			log.item_name.toLowerCase().includes(logSearch.toLowerCase()) ||
+			(employees[log.employee_id] || log.employee_id)
+				.toLowerCase()
+				.includes(logSearch.toLowerCase());
+
+		// Filter by type
+		const matchesType = logType === "All" ? true : log.type === logType;
+
+		// Filter by process
+		const matchesProcess =
+			logProcess === "All"
+				? true
+				: (processMap[log.module] || log.module || "").toLowerCase() ===
+				  logProcess.toLowerCase();
+
+		// Filter by date
+		const matchesDate = logDate ? logDateStr === logDate : true;
+
+		return matchesSearch && matchesType && matchesProcess && matchesDate;
+	});
+
+	const auditLogIndexOfLastItem = logCurrentPage * logItemsPerPage;
+	const auditLogIndexOfFirstItem = logIndexOfLastItem - logItemsPerPage;
+	const currentAuditLogs = filteredAuditLogs.slice(
+		auditLogIndexOfFirstItem,
+		auditLogIndexOfLastItem
+	);
+	const auditLogTotalPages = Math.ceil(
+		filteredAuditLogs.length / logItemsPerPage
+	);
+
 	useEffect(() => {
 		const fetchLogs = async () => {
 			try {
 				const response = await axios.get(
 					"http://localhost:8000/api/inventory-activity-logs"
 				);
+
 				setActivityLogs(response.data.data); // <- use .data here
 			} catch (error) {
 				console.error("Error fetching activity logs:", error);
@@ -362,6 +409,21 @@ function InventoryReport() {
 		};
 
 		fetchLogs();
+	}, []);
+
+	useEffect(() => {
+		const fetchAuditLogs = async () => {
+			try {
+				const response = await axios.get(
+					"http://localhost:8000/api/audit-logs"
+				);
+				setAuditLogs(response.data.data); // <- use .data here
+			} catch (error) {
+				console.error("Error fetching audit logs:", error);
+			}
+		};
+
+		fetchAuditLogs();
 	}, []);
 
 	const itemDisplayNames = {
@@ -380,6 +442,7 @@ function InventoryReport() {
 		Shrinkfilm: "Shrinkfilm",
 	};
 
+	console.log(auditLogs);
 	return (
 		<div
 			className={`dashboard-container ${
@@ -808,6 +871,7 @@ function InventoryReport() {
 						)}
 					</div>
 				</div>
+
 				{/*Generate PDF*/}
 				<div className="text-end mt-3">
 					<button
@@ -995,6 +1059,142 @@ function InventoryReport() {
 									}
 									disabled={
 										logCurrentPage === logTotalPages || logTotalPages === 0
+									}
+								>
+									Next →
+								</button>
+							</div>
+						)}
+					</div>
+				</div>
+				<hr />
+
+				<h2 className="topbar-title">Audit Log</h2>
+				<div className="d-flex gap-2 align-items-center mb-2">
+					<input
+						type="text"
+						placeholder="Search by item or employee"
+						className="form-control"
+						value={auditLogSearch}
+						onChange={(e) => setAuditLogSearch(e.target.value)}
+						style={{ width: "200px" }}
+					/>
+
+					<div className="flex gap-0">
+						<input
+							type="date"
+							className="form-control rounded-end-0"
+							style={{ width: "150px" }}
+							value={auditLogDate}
+							max={new Date().toISOString().split("T")[0]}
+							onChange={(e) => setAuditLogDate(e.target.value)}
+						/>
+						<button
+							className="btn btn-sm btn-secondary rounded-start-0"
+							onClick={() => setAuditLogDate("")}
+							disabled={!auditLogDate}
+						>
+							View All
+						</button>
+					</div>
+
+					<select
+						className="custom-select"
+						value={auditLogType}
+						onChange={(e) => setAuditLogType(e.target.value)}
+					>
+						<option value="All">All Types</option>
+						<option value="Finished Goods">Finished Goods</option>
+						<option value="Raw Materials">Raw Materials</option>
+					</select>
+					<select
+						className="custom-select"
+						value={auditLogProcess}
+						onChange={(e) => setLogProcess(e.target.value)}
+					>
+						<option value="All">All Processes</option>
+						{Object.values(processMap).map((proc) => (
+							<option key={proc} value={proc}>
+								{proc}
+							</option>
+						))}
+					</select>
+				</div>
+				<div className="topbar-inventory-box mt-2">
+					<div className="table-responsive">
+						<table className="custom-table">
+							<thead>
+								<tr>
+									<th>Creator</th>
+									<th>Date</th>
+									<th>Module</th>
+									<th>Action</th>
+									<th>Processed By</th>
+									<th>Date Processed</th>
+									<th>Current Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								{auditLogs.length > 0 ? (
+									auditLogs.map((log, index) => {
+										function formatToMDY(datetime) {
+											if (!datetime) return "";
+
+											const d = new Date(datetime.replace(" ", "T"));
+											if (isNaN(d)) return "";
+
+											const month = d.getMonth() + 1; // 0-based
+											const day = d.getDate();
+											const year = d.getFullYear();
+
+											return `${month}/${day}/${year}`;
+										}
+
+										return (
+											<tr key={index}>
+												<td>{log.creator.employeeID}</td>
+												<td>{formatToMDY(log.created_at)}</td>
+												<td>{log.module}</td>
+												<td>{log.action}</td>
+												<td>{log.performer.employeeID}</td>
+												<td>{formatToMDY(log.updated_at)}</td>
+												<td>{log.status}</td>
+											</tr>
+										);
+									})
+								) : (
+									<tr>
+										<td colSpan="9" className="text-center">
+											No audit logs found.
+										</td>
+									</tr>
+								)}
+							</tbody>
+						</table>
+						{auditLogTotalPages > 1 && (
+							<div className="d-flex justify-content-between mt-2 gap-2">
+								<button
+									className="btn btn-sm btn-light"
+									onClick={() =>
+										setAuditLogCurrentPage((prev) => Math.max(prev - 1, 1))
+									}
+									disabled={auditLogCurrentPage === 1}
+								>
+									← Previous
+								</button>
+								<small>
+									Page {auditLogCurrentPage} of {auditLogCurrentPage}
+								</small>
+								<button
+									className="btn btn-sm btn-light"
+									onClick={() =>
+										setAuditLogCurrentPage((prev) =>
+											Math.min(prev + 1, auditLogCurrentPage)
+										)
+									}
+									disabled={
+										auditLogCurrentPage === auditLogCurrentPage ||
+										auditLogTotalPages === 0
 									}
 								>
 									Next →

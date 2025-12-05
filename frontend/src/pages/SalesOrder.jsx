@@ -1453,6 +1453,7 @@ function SalesOrder() {
 											`http://localhost:8000/api/sales-orders/${order.id}/mark-delivered`,
 											{
 												date_delivered: deliveryDate,
+												employee_id: localStorage.getItem("employeeID"),
 											}
 										);
 

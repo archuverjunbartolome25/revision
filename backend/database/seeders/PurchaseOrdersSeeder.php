@@ -17,6 +17,7 @@ class PurchaseOrdersSeeder extends Seeder
         DB::table('purchase_orders')->insert([
             [
                 'id' => 1,
+                'created_by' => 1,
                 'po_number' => 'PO-1762102282082',
                 'supplier_name' => 'Mc Bride Corporation',
                 'order_date' => '2025-11-02',
@@ -28,6 +29,7 @@ class PurchaseOrdersSeeder extends Seeder
             ],
             [
                 'id' => 2,
+                'created_by' => 1,
                 'po_number' => 'PO-1762169848814',
                 'supplier_name' => 'Filpet, Inc.',
                 'order_date' => '2025-11-03',
@@ -39,6 +41,7 @@ class PurchaseOrdersSeeder extends Seeder
             ],
             [
                 'id' => 3,
+                'created_by' => 1,
                 'po_number' => 'PO-1762180484692',
                 'supplier_name' => 'Royalseal',
                 'order_date' => '2025-11-03',
@@ -50,6 +53,7 @@ class PurchaseOrdersSeeder extends Seeder
             ],
             [
                 'id' => 4,
+                'created_by' => 1,
                 'po_number' => 'PO-1762242680745',
                 'supplier_name' => 'Mc Bride Corporation',
                 'order_date' => '2025-11-04',
@@ -61,6 +65,7 @@ class PurchaseOrdersSeeder extends Seeder
             ],
             [
                 'id' => 5,
+                'created_by' => 1,
                 'po_number' => 'PO-1762270221965',
                 'supplier_name' => 'Synergy',
                 'order_date' => '2025-11-04',
