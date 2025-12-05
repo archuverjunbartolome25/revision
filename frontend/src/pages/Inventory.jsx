@@ -137,6 +137,7 @@ function Inventory() {
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 	const [materialsNeeded, setMaterialsNeeded] = useState([]);
+
 	const [stockNotifications, setStockNotifications] = useState([]);
 	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
@@ -168,9 +169,18 @@ function Inventory() {
 		setSelectedFinishedGood(item);
 		// setSelectedFinishedGoodPrice(item.unit_cost || 0);
 
-		const bomRawMaterials = item.materials_needed || [];
-		setMaterialsNeeded(bomRawMaterials); // pre-fill modal with existing materials
+		// const bomRawMaterials = item.materials_needed || [];
+		const bomRawMaterials = item.selected_materials.map((item) => {
+			return {
+				name: item.raw_material_name,
+				supplier: item.supplier_name,
+				id: item.raw_material_id,
+			};
+		});
 
+		console.log(item.selected_materials);
+
+		setMaterialsNeeded(bomRawMaterials);
 		setShowBOMModal(true);
 	};
 
@@ -283,6 +293,8 @@ function Inventory() {
 	useEffect(() => {
 		fetchNotification();
 	}, []);
+
+	console.log("inventoryData", inventoryData);
 
 	// Assign stock_notification based on backend checkItemStock logic
 	const inventoryWithStatus = inventoryData.map((i) => {
@@ -1115,10 +1127,13 @@ function Inventory() {
 												</td>
 											</tr>
 										) : (
-											materialsNeeded.map((rmName, idx) => {
+											materialsNeeded.map((material, idx) => {
 												const rawMat = rawInventoryData.find(
-													(rm) => rm.item === rmName
+													(rm) =>
+														material.name == rm.item &&
+														rm.supplier_name == material.supplier
 												);
+
 												return (
 													<tr key={idx}>
 														<td>{rawMat?.item}</td>
@@ -1181,7 +1196,7 @@ function Inventory() {
 								<hr />
 
 								{/* Dropdowns to add new materials */}
-								{materialsNeeded.map((rmName, idx) => {
+								{materialsNeeded.map((material, idx) => {
 									const selectedValues = materialsNeeded.filter(
 										(_, i) => i !== idx
 									);
@@ -1194,18 +1209,36 @@ function Inventory() {
 										<div key={idx} className="d-flex gap-2 mb-2">
 											<select
 												className="form-select"
-												value={rmName}
-												onChange={(e) =>
-													setMaterialsNeeded((prev) =>
-														prev.map((v, i) => (i === idx ? e.target.value : v))
-													)
-												}
+												value={`${material.name} (${material.supplier})` || ""}
+												onChange={(e) => {
+													const materialFound = rawInventoryData.find(
+														(rm) =>
+															`${rm.item} (${rm.supplier_name})` ===
+															e.target.value
+													);
+
+													const newMaterialsNeeded = materialsNeeded.map(
+														(mat) => {
+															if (!mat.id) {
+																return {
+																	id: materialFound.id,
+																	name: materialFound.item,
+																	supplier: materialFound.supplier_name,
+																};
+															}
+
+															return mat;
+														}
+													);
+
+													setMaterialsNeeded(newMaterialsNeeded);
+												}}
 											>
 												<option value="">-- Select Material --</option>
 												{options.map((opt) => (
 													<option
 														key={`${opt.item}-${opt.supplier_name}`}
-														value={opt.item}
+														value={`${opt.item} (${opt.supplier_name})`}
 													>
 														{opt.item} ({opt.supplier_name || "No Supplier"})
 													</option>
@@ -1231,7 +1264,12 @@ function Inventory() {
 								<div className="d-flex gap-2 mt-2">
 									<button
 										className="btn btn-sm btn-primary"
-										onClick={() => setMaterialsNeeded((prev) => [...prev, ""])}
+										onClick={() =>
+											setMaterialsNeeded((prev) => [
+												...prev,
+												{ name: "", supplier: "", id: null },
+											])
+										}
 									>
 										+ Add More
 									</button>
@@ -1239,12 +1277,20 @@ function Inventory() {
 									<button
 										className="btn btn-sm btn-success"
 										onClick={async () => {
-											// Remove empty selections
-											const selectedMaterials = materialsNeeded.filter(Boolean);
+											const materialsClean = materialsNeeded.map(
+												(mat) => mat.name
+											);
+
+											const selectedMaterials = materialsNeeded.map((mat) => {
+												return {
+													supplier: mat.supplier,
+													name: mat.name,
+												};
+											});
 
 											if (
 												!selectedFinishedGood ||
-												selectedMaterials.length === 0
+												materialsClean.length === 0
 											) {
 												showMessage("❌ Please select at least one material.");
 												return;
@@ -1254,13 +1300,16 @@ function Inventory() {
 												// Update backend
 												await axios.put(
 													`http://localhost:8000/api/inventories/${selectedFinishedGood.id}/update-materials`,
-													{ materials_needed: selectedMaterials }
+													{
+														materials_needed: materialsClean,
+														selected_materials: selectedMaterials,
+													}
 												);
 
 												// Update selectedFinishedGood and BOM preview
 												setSelectedFinishedGood((prev) => ({
 													...prev,
-													materials_needed: selectedMaterials,
+													materials_needed: materialsClean,
 												}));
 
 												// Close modal & feedback
@@ -1295,9 +1344,11 @@ function Inventory() {
 												</tr>
 											</thead>
 											<tbody>
-												{materialsNeeded.map((rmName, idx) => {
+												{materialsNeeded.map((material, idx) => {
 													const rawMat = rawInventoryData.find(
-														(rm) => rm.item === rmName
+														(rm) =>
+															`${rm.item} (${rm.supplier_name})` ===
+															`${material.name} (${material.supplier})`
 													);
 													return (
 														<tr key={idx}>
@@ -1317,7 +1368,7 @@ function Inventory() {
 																	className="btn btn-sm btn-danger"
 																	onClick={() =>
 																		setMaterialsNeeded((prev) =>
-																			prev.filter((m) => m !== rmName)
+																			prev.filter((_, i) => i !== idx)
 																		)
 																	}
 																>

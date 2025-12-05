@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\AuditLog;
+use App\Models\User;
 
 class ProductionOutputController extends Controller
 {
@@ -16,7 +18,337 @@ class ProductionOutputController extends Controller
             ->get();
     }
 
+    // * OLD WITHOUT AUDIT LOG
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'products' => 'required|array',
+    //         'products.*.product_name' => 'required|string',
+    //         'products.*.quantity_pcs' => 'required|integer|min:1',
+    //         'products.*.raw_materials' => 'nullable|array',
+    //         'batch_number' => 'nullable|string',
+    //     ]);
     
+    //     $employeeId = $request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN';
+    //     $batchNumber = $request->batch_number ?? 'BATCH-' . now()->format('YmdHis');
+    
+    //     $debugInfo = [];
+        
+    //     $affectedFinishedGoods = [];
+    //     $affectedRawMaterials = [];
+    
+    //     DB::beginTransaction();
+    
+    //     try {
+    //         foreach ($request->products as $prod) {
+    //             $productName = trim($prod['product_name']);
+    //             $quantityPcs = (int) $prod['quantity_pcs'];
+    
+    //             $finishedGood = \App\Models\Inventory::whereRaw(
+    //                 'LOWER(item) = ?',
+    //                 [strtolower($productName)]
+    //             )->first();
+    //             $pcsPerUnit = $finishedGood->pcs_per_unit ?? 1;
+    
+    //             $materialsNeeded = [];
+    //             if ($finishedGood && $finishedGood->materials_needed) {
+    //                 $decoded = json_decode($finishedGood->materials_needed, true);
+    //                 if (json_last_error() === JSON_ERROR_NONE) {
+    //                     foreach ($decoded as $key => $val) {
+    //                         $materialsNeeded[] = is_numeric($key) ? trim($val) : trim($key);
+    //                     }
+    //                 }
+    //             }
+    
+    //             $keyedMaterials = [];
+    //             $selectedSuppliers = [];
+    
+    //             $requestRawMaterials = $prod['rawMaterials'] ?? $prod['raw_materials'] ?? [];
+    //             $debugInfo['raw_materials_received'] = $requestRawMaterials;
+    
+    //             foreach ($materialsNeeded as $mat) {
+    //                 $keyedMaterials[$mat] = $quantityPcs;
+    //             }
+    
+    //             foreach ($requestRawMaterials as $raw) {
+    //                 $matName = trim($raw['material'] ?? $raw['name'] ?? '');
+    //                 $qty = (int) ($raw['quantity'] ?? $quantityPcs);
+    //                 if ($qty <= 0) continue;
+    //                 $keyedMaterials[$matName] = $qty;
+    
+    //                 if (!empty($raw['supplier_id'])) {
+    //                     $selectedSuppliers[$matName] = $raw['supplier_id'];
+    //                     $debugInfo['supplier_lookup'][$matName] = [
+    //                         'method' => 'supplier_id_provided',
+    //                         'value' => $raw['supplier_id'],
+    //                     ];
+    //                 } elseif (!empty($raw['supplier'])) {
+    //                     $supplier = DB::table('suppliers')
+    //                         ->whereRaw('LOWER(name) = ?', [strtolower(trim($raw['supplier']))])
+    //                         ->first();
+    
+    //                     if ($supplier) {
+    //                         $selectedSuppliers[$matName] = $supplier->id;
+    //                         $debugInfo['supplier_lookup'][$matName] = [
+    //                             'method' => 'name_lookup',
+    //                             'searched_for' => $raw['supplier'],
+    //                             'found_id' => $supplier->id,
+    //                             'found_name' => $supplier->name ?? 'N/A',
+    //                         ];
+    //                     } else {
+    //                         $debugInfo['supplier_lookup'][$matName] = [
+    //                             'method' => 'name_lookup',
+    //                             'searched_for' => $raw['supplier'],
+    //                             'found' => false,
+    //                             'error' => 'Supplier not found in database',
+    //                         ];
+    //                     }
+    //                 }
+    //             }
+    
+    //             foreach ($keyedMaterials as $rawMat => $qty) {
+    //                 if (!isset($selectedSuppliers[$rawMat])) {
+    //                     $supplier = DB::table('supplier_offers')
+    //                         ->join('inventory_rawmats', 'inventory_rawmats.id', '=', 'supplier_offers.rawmat_id')
+    //                         ->select('supplier_offers.supplier_id')
+    //                         ->whereRaw('LOWER(inventory_rawmats.item) = ?', [strtolower($rawMat)])
+    //                         ->first();
+    
+    //                     if ($supplier) {
+    //                         $selectedSuppliers[$rawMat] = $supplier->supplier_id;
+    //                         $debugInfo['supplier_lookup'][$rawMat] = [
+    //                             'method' => 'auto_assigned',
+    //                             'value' => $supplier->supplier_id,
+    //                         ];
+    //                     } else {
+    //                         $debugInfo['supplier_lookup'][$rawMat] = [
+    //                             'method' => 'auto_assigned',
+    //                             'value' => null,
+    //                             'error' => 'No supplier found',
+    //                         ];
+    //                     }
+    //                 }
+    //             }
+    
+    //             $debugInfo['keyed_materials'] = $keyedMaterials;
+    //             $debugInfo['selected_suppliers'] = $selectedSuppliers;
+    
+    //             \App\Models\ProductionOutput::create([
+    //                 'employee_id' => $employeeId,
+    //                 'product_name' => $productName,
+    //                 'quantity_pcs' => $quantityPcs,
+    //                 'quantity' => floor($quantityPcs / $pcsPerUnit),
+    //                 'materials_needed' => $keyedMaterials,
+    //                 'selected_suppliers' => $selectedSuppliers,
+    //                 'batch_number' => $batchNumber,
+    //                 'production_date' => now(),
+    //             ]);
+    
+    //             if ($finishedGood) {
+    //                 $previousQuantity = $finishedGood->quantity_pcs;
+    //                 $finishedGood->quantity_pcs += $quantityPcs;
+    //                 $finishedGood->quantity = floor($finishedGood->quantity_pcs / $pcsPerUnit);
+    //                 $finishedGood->save();
+                
+    //                 $remainingQuantity = $finishedGood->quantity_pcs; 
+                
+    //                 $affectedFinishedGoods[] = $finishedGood->id;
+                
+    //                 // Log finished goods
+    //                 \App\Models\InventoryActivityLog::create([
+    //                     'employee_id' => $employeeId,
+    //                     'module' => 'Production Output',
+    //                     'type' => 'Finished Goods',
+    //                     'item_name' => $productName,
+    //                     'quantity' => $quantityPcs,
+    //                     'previous_quantity' => $previousQuantity,
+    //                     'remaining_quantity'=> $remainingQuantity,
+    //                     'processed_at' => now(),
+    //                 ]);
+    //             }
+    
+    //             foreach ($keyedMaterials as $rawItem => $usedQtyPcs) {
+    //                 $supplierId = $selectedSuppliers[$rawItem] ?? null;
+    //                 $remaining = $usedQtyPcs;
+    
+    //                 $debugInfo['deduction'][$rawItem] = [
+    //                     'requested_qty_pcs' => $usedQtyPcs,
+    //                     'supplier_id' => $supplierId,
+    //                 ];
+    
+    //                 if ($supplierId) {
+    //                     // Find raw material ID first
+    //                     $rawMaterial = DB::table('inventory_rawmats')
+    //                         ->whereRaw('LOWER(item) = ?', [strtolower($rawItem)])
+    //                         ->first();
+    
+    //                     if (!$rawMaterial) {
+    //                         $debugInfo['deduction'][$rawItem]['error'] = 'Raw material not found';
+    //                         continue;
+    //                     }
+    
+    //                     $inventories = DB::table('inventory_rawmats as ir')
+    //                         ->join('supplier_offers as so', function ($join) use ($supplierId, $rawMaterial) {
+    //                             $join->on('so.rawmat_id', '=', 'ir.id')
+    //                                 ->where('so.supplier_id', $supplierId)
+    //                                 ->where('so.rawmat_id', $rawMaterial->id);
+    //                         })
+    //                         ->select('ir.*')
+    //                         ->whereRaw('LOWER(ir.item) = ?', [strtolower($rawItem)])
+    //                         ->where('ir.quantity_pieces', '>', 0)
+    //                         ->orderBy('ir.quantity_pieces', 'desc')
+    //                         ->get();
+    
+    //                     $debugInfo['deduction'][$rawItem]['inventory_found'] = $inventories->count();
+    //                     $debugInfo['deduction'][$rawItem]['inventory_details'] = $inventories->map(function ($inv) {
+    //                         return [
+    //                             'id' => $inv->id,
+    //                             'item' => $inv->item,
+    //                             'quantity_pieces' => $inv->quantity_pieces,
+    //                         ];
+    //                     })->toArray();
+    
+    //                     foreach ($inventories as $stock) {
+    //                         if ($remaining <= 0) break;
+                        
+    //                         $deductPcs = min($remaining, $stock->quantity_pieces);
+    //                         $conversion = $stock->conversion ?? 1;
+                        
+    //                         // Compute previous quantity before deduction
+    //                         $previousQuantity = $stock->quantity_pieces;
+                        
+    //                         // Compute new quantities
+    //                         $newQuantityPieces = max(0, $stock->quantity_pieces - $deductPcs);
+    //                         $newQuantity = floor($newQuantityPieces / $conversion);
+                        
+    //                         // Update the inventory
+    //                         DB::table('inventory_rawmats')
+    //                             ->where('id', $stock->id)
+    //                             ->update([
+    //                                 'quantity_pieces' => $newQuantityPieces,
+    //                                 'quantity' => $newQuantity,
+    //                                 'updated_at' => now(),
+    //                             ]);
+                        
+    //                         // Track affected inventory items
+    //                         if (!in_array($stock->id, $affectedRawMaterials)) {
+    //                             $affectedRawMaterials[] = $stock->id;
+    //                         }
+                        
+    //                         // Log activity with previous and remaining quantities
+    //                         \App\Models\InventoryActivityLog::create([
+    //                             'employee_id' => $employeeId,
+    //                             'module' => 'Production Output',
+    //                             'type' => 'Raw Materials',
+    //                             'item_name' => $rawItem,
+    //                             'quantity' => $deductPcs,
+    //                             'previous_quantity' => $previousQuantity,
+    //                             'remaining_quantity' => $newQuantityPieces,
+    //                             'processed_at' => now(),
+    //                         ]);
+                        
+    //                         // Reduce remaining quantity to deduct
+    //                         $remaining -= $deductPcs;
+    //                     }
+    //                 } else {
+    //                     $inventories = DB::table('inventory_rawmats')
+    //                         ->whereRaw('LOWER(item) = ?', [strtolower($rawItem)])
+    //                         ->where('quantity_pieces', '>', 0)
+    //                         ->orderBy('quantity_pieces', 'desc')
+    //                         ->get();
+    
+    //                     $debugInfo['deduction'][$rawItem]['inventory_found'] = $inventories->count();
+    //                     $debugInfo['deduction'][$rawItem]['inventory_details'] = $inventories->map(function ($inv) {
+    //                         return [
+    //                             'id' => $inv->id,
+    //                             'item' => $inv->item,
+    //                             'quantity_pieces' => $inv->quantity_pieces,
+    //                         ];
+    //                     })->toArray();
+    
+    //                     foreach ($inventories as $stock) {
+    //                         if ($remaining <= 0) break;
+                        
+    //                         $deductPcs = min($remaining, $stock->quantity_pieces);
+    //                         $conversion = $stock->conversion ?? 1;
+                        
+    //                         // Compute previous quantity before deduction
+    //                         $previousQuantity = $stock->quantity_pieces;
+                        
+    //                         // Compute new quantities
+    //                         $newQuantityPieces = max(0, $stock->quantity_pieces - $deductPcs);
+    //                         $newQuantity = floor($newQuantityPieces / $conversion);
+                        
+    //                         // Update the inventory
+    //                         DB::table('inventory_rawmats')
+    //                             ->where('id', $stock->id)
+    //                             ->update([
+    //                                 'quantity_pieces' => $newQuantityPieces,
+    //                                 'quantity' => $newQuantity,
+    //                                 'updated_at' => now(),
+    //                             ]);
+                        
+    //                         // Track affected inventory items
+    //                         if (!in_array($stock->id, $affectedRawMaterials)) {
+    //                             $affectedRawMaterials[] = $stock->id;
+    //                         }
+                        
+    //                         // Log activity including previous and remaining quantities
+    //                         \App\Models\InventoryActivityLog::create([
+    //                             'employee_id' => $employeeId,
+    //                             'module' => 'Production Output',
+    //                             'type' => 'Raw Materials',
+    //                             'item_name' => $rawItem,
+    //                             'quantity' => $deductPcs,
+    //                             'previous_quantity' => $previousQuantity,
+    //                             'remaining_quantity' => $newQuantityPieces,
+    //                             'processed_at' => now(),
+    //                         ]);
+                        
+    //                         // Decrease remaining quantity to deduct
+    //                         $remaining -= $deductPcs;
+    //                     }
+                        
+    //                 }
+    
+    //                 $debugInfo['deduction'][$rawItem]['remaining_after'] = $remaining;
+    
+    //                 if ($remaining > 0) {
+    //                     $debugInfo['deduction'][$rawItem]['warning'] = "Not enough inventory, {$remaining} pieces could not be deducted";
+    //                 }
+    //             }
+    //         }
+    
+    //         DB::commit();
+    
+    //         $this->checkAndUpdateNotifications($affectedFinishedGoods, $affectedRawMaterials);
+    
+    //         return response()->json([
+    //             'message' => 'Production output recorded successfully.',
+    //             'debug' => $debugInfo,
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //             'debug' => $debugInfo ?? [],
+    //         ], 500);
+    //     }
+    // }
+
+
+    private function getOriginalCreator($module, $recordId)
+    {
+        $firstLog = AuditLog::where('module', $module)
+                            ->where('record_id', $recordId)
+                            ->orderBy('created_at', 'asc')
+                            ->first();
+        
+        return $firstLog ? $firstLog->created_by : null;
+    }
+
+    // * WITH AUDIT LOG
     public function store(Request $request)
     {
         $request->validate([
@@ -26,28 +358,36 @@ class ProductionOutputController extends Controller
             'products.*.raw_materials' => 'nullable|array',
             'batch_number' => 'nullable|string',
         ]);
-    
+
         $employeeId = $request->employee_id ?? auth()->user()->employeeID ?? 'UNKNOWN';
+        $user = null;
+        if ($employeeId) {
+            $user = User::where('employeeID', $employeeId)->first();
+        }
+
+        // Step 3: Get the real user ID to use later
+        $auditCreatorID = $user ? $user->id : null;
+
         $batchNumber = $request->batch_number ?? 'BATCH-' . now()->format('YmdHis');
-    
+
         $debugInfo = [];
         
         $affectedFinishedGoods = [];
         $affectedRawMaterials = [];
-    
+
         DB::beginTransaction();
-    
+
         try {
             foreach ($request->products as $prod) {
                 $productName = trim($prod['product_name']);
                 $quantityPcs = (int) $prod['quantity_pcs'];
-    
+
                 $finishedGood = \App\Models\Inventory::whereRaw(
                     'LOWER(item) = ?',
                     [strtolower($productName)]
                 )->first();
                 $pcsPerUnit = $finishedGood->pcs_per_unit ?? 1;
-    
+
                 $materialsNeeded = [];
                 if ($finishedGood && $finishedGood->materials_needed) {
                     $decoded = json_decode($finishedGood->materials_needed, true);
@@ -57,23 +397,23 @@ class ProductionOutputController extends Controller
                         }
                     }
                 }
-    
+
                 $keyedMaterials = [];
                 $selectedSuppliers = [];
-    
+
                 $requestRawMaterials = $prod['rawMaterials'] ?? $prod['raw_materials'] ?? [];
                 $debugInfo['raw_materials_received'] = $requestRawMaterials;
-    
+
                 foreach ($materialsNeeded as $mat) {
                     $keyedMaterials[$mat] = $quantityPcs;
                 }
-    
+
                 foreach ($requestRawMaterials as $raw) {
                     $matName = trim($raw['material'] ?? $raw['name'] ?? '');
                     $qty = (int) ($raw['quantity'] ?? $quantityPcs);
                     if ($qty <= 0) continue;
                     $keyedMaterials[$matName] = $qty;
-    
+
                     if (!empty($raw['supplier_id'])) {
                         $selectedSuppliers[$matName] = $raw['supplier_id'];
                         $debugInfo['supplier_lookup'][$matName] = [
@@ -84,7 +424,7 @@ class ProductionOutputController extends Controller
                         $supplier = DB::table('suppliers')
                             ->whereRaw('LOWER(name) = ?', [strtolower(trim($raw['supplier']))])
                             ->first();
-    
+
                         if ($supplier) {
                             $selectedSuppliers[$matName] = $supplier->id;
                             $debugInfo['supplier_lookup'][$matName] = [
@@ -103,7 +443,7 @@ class ProductionOutputController extends Controller
                         }
                     }
                 }
-    
+
                 foreach ($keyedMaterials as $rawMat => $qty) {
                     if (!isset($selectedSuppliers[$rawMat])) {
                         $supplier = DB::table('supplier_offers')
@@ -111,7 +451,7 @@ class ProductionOutputController extends Controller
                             ->select('supplier_offers.supplier_id')
                             ->whereRaw('LOWER(inventory_rawmats.item) = ?', [strtolower($rawMat)])
                             ->first();
-    
+
                         if ($supplier) {
                             $selectedSuppliers[$rawMat] = $supplier->supplier_id;
                             $debugInfo['supplier_lookup'][$rawMat] = [
@@ -127,11 +467,12 @@ class ProductionOutputController extends Controller
                         }
                     }
                 }
-    
+
                 $debugInfo['keyed_materials'] = $keyedMaterials;
                 $debugInfo['selected_suppliers'] = $selectedSuppliers;
-    
-                \App\Models\ProductionOutput::create([
+
+                // CREATE PRODUCTION OUTPUT
+                $production = \App\Models\ProductionOutput::create([
                     'employee_id' => $employeeId,
                     'product_name' => $productName,
                     'quantity_pcs' => $quantityPcs,
@@ -141,7 +482,19 @@ class ProductionOutputController extends Controller
                     'batch_number' => $batchNumber,
                     'production_date' => now(),
                 ]);
-    
+
+                // ========================================
+                // CREATE AUDIT LOG
+                // ========================================
+                \App\Models\AuditLog::create([
+                    'module' => 'Production Output',
+                    'record_id' => $production->id,
+                    'action' => 'Created',
+                    'status' => 'Produced',
+                    'created_by' => $auditCreatorID,
+                    'performed_by' => $auditCreatorID ?? Unknown,
+                ]);
+
                 if ($finishedGood) {
                     $previousQuantity = $finishedGood->quantity_pcs;
                     $finishedGood->quantity_pcs += $quantityPcs;
@@ -164,27 +517,27 @@ class ProductionOutputController extends Controller
                         'processed_at' => now(),
                     ]);
                 }
-    
+
                 foreach ($keyedMaterials as $rawItem => $usedQtyPcs) {
                     $supplierId = $selectedSuppliers[$rawItem] ?? null;
                     $remaining = $usedQtyPcs;
-    
+
                     $debugInfo['deduction'][$rawItem] = [
                         'requested_qty_pcs' => $usedQtyPcs,
                         'supplier_id' => $supplierId,
                     ];
-    
+
                     if ($supplierId) {
                         // Find raw material ID first
                         $rawMaterial = DB::table('inventory_rawmats')
                             ->whereRaw('LOWER(item) = ?', [strtolower($rawItem)])
                             ->first();
-    
+
                         if (!$rawMaterial) {
                             $debugInfo['deduction'][$rawItem]['error'] = 'Raw material not found';
                             continue;
                         }
-    
+
                         $inventories = DB::table('inventory_rawmats as ir')
                             ->join('supplier_offers as so', function ($join) use ($supplierId, $rawMaterial) {
                                 $join->on('so.rawmat_id', '=', 'ir.id')
@@ -196,7 +549,7 @@ class ProductionOutputController extends Controller
                             ->where('ir.quantity_pieces', '>', 0)
                             ->orderBy('ir.quantity_pieces', 'desc')
                             ->get();
-    
+
                         $debugInfo['deduction'][$rawItem]['inventory_found'] = $inventories->count();
                         $debugInfo['deduction'][$rawItem]['inventory_details'] = $inventories->map(function ($inv) {
                             return [
@@ -205,7 +558,7 @@ class ProductionOutputController extends Controller
                                 'quantity_pieces' => $inv->quantity_pieces,
                             ];
                         })->toArray();
-    
+
                         foreach ($inventories as $stock) {
                             if ($remaining <= 0) break;
                         
@@ -254,7 +607,7 @@ class ProductionOutputController extends Controller
                             ->where('quantity_pieces', '>', 0)
                             ->orderBy('quantity_pieces', 'desc')
                             ->get();
-    
+
                         $debugInfo['deduction'][$rawItem]['inventory_found'] = $inventories->count();
                         $debugInfo['deduction'][$rawItem]['inventory_details'] = $inventories->map(function ($inv) {
                             return [
@@ -263,7 +616,7 @@ class ProductionOutputController extends Controller
                                 'quantity_pieces' => $inv->quantity_pieces,
                             ];
                         })->toArray();
-    
+
                         foreach ($inventories as $stock) {
                             if ($remaining <= 0) break;
                         
@@ -308,19 +661,19 @@ class ProductionOutputController extends Controller
                         }
                         
                     }
-    
+
                     $debugInfo['deduction'][$rawItem]['remaining_after'] = $remaining;
-    
+
                     if ($remaining > 0) {
                         $debugInfo['deduction'][$rawItem]['warning'] = "Not enough inventory, {$remaining} pieces could not be deducted";
                     }
                 }
             }
-    
+
             DB::commit();
-    
+
             $this->checkAndUpdateNotifications($affectedFinishedGoods, $affectedRawMaterials);
-    
+
             return response()->json([
                 'message' => 'Production output recorded successfully.',
                 'debug' => $debugInfo,
@@ -334,7 +687,7 @@ class ProductionOutputController extends Controller
             ], 500);
         }
     }
-    
+        
     private function checkAndUpdateNotifications(array $finishedGoodsIds, array $rawMaterialIds)
     {
         foreach ($finishedGoodsIds as $id) {

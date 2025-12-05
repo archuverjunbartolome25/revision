@@ -13,7 +13,7 @@ return new class extends Migration
             
             $table->unsignedBigInteger('employee_id')->nullable();
             $table->unsignedBigInteger('customer_id');
-
+ 
             $table->string('location');
             $table->jsonb('products');     // Changed from text to jsonb
             $table->jsonb('quantities');   // Changed from text to jsonb

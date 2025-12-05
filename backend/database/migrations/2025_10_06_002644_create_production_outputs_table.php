@@ -12,10 +12,6 @@ return new class extends Migration
             $table->id();
             $table->string('product_name');
             $table->integer('quantity')->default(0);
-            $table->integer('qty_350ml')->default(0);
-            $table->integer('qty_500ml')->default(0);
-            $table->integer('qty_1l')->default(0);
-            $table->integer('qty_6l')->default(0);
             $table->integer('quantity_pcs')->default(0);
             $table->json('materials_needed')->nullable();
             $table->json('selected_suppliers')->nullable();

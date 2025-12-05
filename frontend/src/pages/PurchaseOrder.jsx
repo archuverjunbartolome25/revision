@@ -301,7 +301,7 @@ function PurchaseOrder() {
 
 		fetchSuppliersAndOffers();
 	}, []);
-
+	console.log(orderItems);
 	const fetchSupplierOffers = async (supplierId) => {
 		try {
 			await ensureCsrf();
@@ -425,32 +425,18 @@ function PurchaseOrder() {
 				return;
 			}
 
-			const rawMaterialNames = [
-				"350ml",
-				"500ml",
-				"1L",
-				"6L",
-				"Cap",
-				"6L Cap",
-				"Stretchfilm",
-				"Shrinkfilm",
-				"Label",
-			];
-
 			await ensureCsrf();
 			const response = await api.post("/api/purchase-orders", formData);
 			const poId = response.data.id;
 
 			for (let item of validItems) {
-				const item_type = rawMaterialNames.includes(item.item_name)
-					? "raw"
-					: "finished";
-
 				await api.post("/api/purchase-order-items", {
 					purchase_order_id: poId,
 					item_name: item.item_name,
-					item_type,
+					item_type: "raw",
 					quantity: item.quantity,
+					unit_cost: item.unit_price,
+					total_amount: item.unit_price * item.quantity,
 				});
 			}
 
@@ -494,6 +480,9 @@ function PurchaseOrder() {
 
 				if (qty > 0) {
 					await ensureCsrf();
+
+					console.log(item);
+
 					await api.post(`/api/purchase-orders/${selectedOrder.id}/receive`, {
 						item_id: item.id,
 						quantity: qty,

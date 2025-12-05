@@ -7,70 +7,192 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+
 
 
 class ReportController extends Controller
 {
-public function salesReport(Request $request)
-{
-    // BOM / unit cost per bottle
-    $UNIT_COGS = [
-        '350ml' => 2.89,
-        '500ml' => 3.29,
-        '1L'    => 3.79,
-        '6L'    => 5.00,
-    ];
 
-    // Pieces per case
-    $PCS_PER_CASE = [
-        '350ml' => 24,
-        '500ml' => 24,
-        '1L'    => 12,
-        '6L'    => 1,
-    ];
+// *NEW
+    public function salesReport(Request $request)
+    {
+        // Fetch inventory
+        $inventoryMap = DB::table('inventories')
+            ->select('item', 'unit_cost as selling_price', 'selected_materials', 'pcs_per_unit')
+            ->get()
+            ->keyBy('item');
+    
+        // Fetch supplier offers WITH raw material conversion
+        $supplierOffersMap = DB::table('supplier_offers as so')
+            ->join('inventory_rawmats as rm', 'so.rawmat_id', '=', 'rm.id')
+            ->select(
+                'so.id', 
+                'so.price', 
+                'rm.conversion',  // ← Field that contains qty per unit
+                'rm.item as rawmat_name'
+            )
+            ->get()
+            ->keyBy('id');
+    
+        Log::info("Supplier Offers with Raw Materials:", $supplierOffersMap->toArray());
+    
+        $salesOrders = DB::table('sales_orders as so')
+            ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
+            ->select(
+                'so.id',
+                'so.location',
+                'so.date',
+                'so.products',
+                'so.delivery_date',
+                'so.date_delivered',
+                'so.status',
+                'so.order_type',
+                'so.amount as total_sales',
+                'so.quantities',
+                'c.name as customer_name'
+            )
+            ->orderBy('so.date', 'desc')
+            ->get()
+            ->map(function ($order) use ($inventoryMap, $supplierOffersMap) {
+    
+                $quantities = json_decode($order->quantities, true) ?? [];
+                $cogs = 0;
+                $totalQty = 0;
+    
+                Log::info("=== Order {$order->id} ===");
+    
+                foreach ($quantities as $productName => $casesSold) {
+                    $casesSold = (int)$casesSold;
+                    $totalQty += $casesSold;
+    
+                    $inventory = $inventoryMap->get($productName);
+    
+                    if (!$inventory) {
+                        Log::warning("No inventory for: $productName");
+                        continue;
+                    }
+    
+                    Log::info("Product: $productName | Cases Sold: $casesSold");
+                    
+                    $selectedMaterials = json_decode($inventory->selected_materials, true) ?? [];
+                    $productionCostPerCase = 0;
+                    $pcsPerCase = (int)$inventory->pcs_per_unit ?: 1;
+    
+                    Log::info("Pieces per case: $pcsPerCase");
+                    Log::info("Selected Materials:", $selectedMaterials);
+    
+                    foreach ($selectedMaterials as $rawMatName => $supplierOfferId) {
+                        $supplierOffer = $supplierOffersMap->get($supplierOfferId);
+    
+                        if (!$supplierOffer) {
+                            Log::warning("Supplier offer #$supplierOfferId not found");
+                            continue;
+                        }
+    
+                        $pricePerUnit = (float)$supplierOffer->price;
+                        $conversion = (float)$supplierOffer->conversion ?: 1; // conversion = pieces per unit
+                        
+                        // Price per individual piece of raw material
+                        $pricePerPiece = $pricePerUnit / $conversion;
+                        
+                        // Cost for one case = price per piece × pieces per case
+                        $costPerCase = $pricePerPiece * $pcsPerCase;
+    
+                        Log::info("  Raw Material: {$supplierOffer->rawmat_name} (Offer #$supplierOfferId)");
+                        Log::info("    Price per unit: ₱$pricePerUnit");
+                        Log::info("    Conversion (pcs/unit): $conversion");
+                        Log::info("    Price per piece: ₱" . number_format($pricePerPiece, 4));
+                        Log::info("    Pieces per case: $pcsPerCase");
+                        Log::info("    Cost per case: ₱$pricePerPiece × $pcsPerCase = ₱" . number_format($costPerCase, 2));
+    
+                        $productionCostPerCase += $costPerCase;
+                    }
+    
+                    Log::info("Total Production Cost Per Case: ₱" . number_format($productionCostPerCase, 2));
+                    Log::info("COGS for this product: ₱$productionCostPerCase × $casesSold cases = ₱" . number_format($productionCostPerCase * $casesSold, 2));
+    
+                    $cogs += $productionCostPerCase * $casesSold;
+                }
+    
+                Log::info("==================");
+                Log::info("ORDER TOTALS:");
+                Log::info("Total Sales: ₱" . number_format($order->total_sales, 2));
+                Log::info("Total COGS: ₱" . number_format($cogs, 2));
+                Log::info("Profit: ₱" . number_format($order->total_sales - $cogs, 2));
+                Log::info("==================");
+    
+                $order->total_qty = $totalQty;
+                $order->cogs = round($cogs, 2);
+                $order->profit = round($order->total_sales - $cogs, 2);
+    
+                return $order;
+            });
+    
+        return response()->json($salesOrders);
+    }
 
-    $salesOrders = DB::table('sales_orders as so')
-        ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
-        ->select(
-            'so.id',
-            'so.location',
-            'so.date',
-            'so.products',
-            'so.delivery_date',
-            'so.date_delivered',
-            'so.status',
-            'so.order_type',
-            'so.amount as total_sales',
-            'so.quantities',
-            'c.name as customer_name'
-        )
-        ->orderBy('so.date', 'desc')
-        ->get()
-        ->map(function ($order) use ($UNIT_COGS, $PCS_PER_CASE) {
-            $qty = json_decode($order->quantities, true) ?? [];
-            $totalQty = array_sum(array_map(fn($v) => (int)$v, $qty));
+    // *OLD
+// public function salesReport(Request $request)
+// {
+//     // BOM / unit cost per bottle
+//     $UNIT_COGS = [
+//         '350ml' => 2.89,
+//         '500ml' => 3.29,
+//         '1L'    => 3.79,
+//         '6L'    => 5.00,
+//     ];
 
-            $cogs = 0;
-            foreach ($qty as $product => $cases) {
-                $unitCost = $UNIT_COGS[$product] ?? 0;
-                $piecesPerCase = $PCS_PER_CASE[$product] ?? 1;
+//     // Pieces per case
+//     $PCS_PER_CASE = [
+//         '350ml' => 24,
+//         '500ml' => 24,
+//         '1L'    => 12,
+//         '6L'    => 1,
+//     ];
 
-                // COGS = unit cost * number of pieces in a case * number of cases sold
-                $cogs += $unitCost * $piecesPerCase * (int)$cases;
-            }
+//     $salesOrders = DB::table('sales_orders as so')
+//         ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
+//         ->select(
+//             'so.id',
+//             'so.location',
+//             'so.date',
+//             'so.products',
+//             'so.delivery_date',
+//             'so.date_delivered',
+//             'so.status',
+//             'so.order_type',
+//             'so.amount as total_sales',
+//             'so.quantities',
+//             'c.name as customer_name'
+//         )
+//         ->orderBy('so.date', 'desc')
+//         ->get()
+//         ->map(function ($order) use ($UNIT_COGS, $PCS_PER_CASE) {
+//             $qty = json_decode($order->quantities, true) ?? [];
+//             $totalQty = array_sum(array_map(fn($v) => (int)$v, $qty));
 
-            $totalSales = (float)$order->total_sales;
-            $profit = $totalSales - $cogs;
+//             $cogs = 0;
+//             foreach ($qty as $product => $cases) {
+//                 $unitCost = $UNIT_COGS[$product] ?? 0;
+//                 $piecesPerCase = $PCS_PER_CASE[$product] ?? 1;
 
-            $order->total_qty = $totalQty;
-            $order->cogs = round($cogs, 2);
-            $order->profit = round($profit, 2);
+//                 // COGS = unit cost * number of pieces in a case * number of cases sold
+//                 $cogs += $unitCost * $piecesPerCase * (int)$cases;
+//             }
 
-            return $order;
-        });
+//             $totalSales = (float)$order->total_sales;
+//             $profit = $totalSales - $cogs;
 
-    return response()->json($salesOrders);
-}
+//             $order->total_qty = $totalQty;
+//             $order->cogs = round($cogs, 2);
+//             $order->profit = round($profit, 2);
+
+//             return $order;
+//         });
+
+//     return response()->json($salesOrders);
+// }
 
 public function salesReportPDF(Request $request)
 {

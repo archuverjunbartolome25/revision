@@ -230,7 +230,7 @@ function SalesReport() {
 		  })
 		: salesData;
 
-	// Flatten sales data for COGS table
+	// Flatten sale(s data for COGS table
 	const cogsData = React.useMemo(() => {
 		return filteredSales.flatMap((sale) => {
 			if (!sale.products || !sale.quantities) return [{ ...sale }];
@@ -338,6 +338,8 @@ function SalesReport() {
 			try {
 				const res = await axios.get("http://localhost:8000/api/reports/sales");
 				setSalesData(res.data);
+
+				console.log(res.data);
 			} catch (err) {
 				console.error("Error fetching sales report:", err);
 			} finally {

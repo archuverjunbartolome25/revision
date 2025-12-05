@@ -25,8 +25,8 @@ class InventorySeeder extends Seeder
                 'pcs_per_unit' => 24,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'materials_needed' => '["Plastic Bottle (350ml)","Blue Plastic Cap","Label","Stretchfilm"]',
-                'selected_materials' => '{"Plastic Bottle (350ml)":1,"Blue Plastic Cap":6,"Label":9,"Stretchfilm":11}'
+                'materials_needed' => '["Plastic Bottle (350ml)","Blue Plastic Cap","Label"]',
+                'selected_materials' => '{"Plastic Bottle (350ml)":1,"Blue Plastic Cap":6,"Label":9}'
             ],
             [
                 'id' => 2,
@@ -40,7 +40,7 @@ class InventorySeeder extends Seeder
                 'created_at' => $now,
                 'updated_at' => $now,
                 'materials_needed' => '["Plastic Bottle (500ml)","Blue Plastic Cap","Label"]',
-                'selected_materials' => '{"Plastic Bottle (500ml)":2,"Blue Plastic Cap":2,"Label":4}'
+                'selected_materials' => '{"Plastic Bottle (500ml)":2,"Blue Plastic Cap":7,"Label":10}'
             ],
             [
                 'id' => 3,
@@ -68,7 +68,7 @@ class InventorySeeder extends Seeder
                 'created_at' => $now,
                 'updated_at' => $now,
                 'materials_needed' => '["Plastic Gallon (6L)","Blue Plastic Cap (6L)","Label","Shrinkfilm"]',
-                'selected_materials' => '{"Plastic Gallon (6L)":1,"Blue Plastic Cap (6L)":1,"Label":3,"Shrinkfilm":6}'
+                'selected_materials' => '{"Plastic Gallon (6L)":5,"Blue Plastic Cap (6L)":8,"Label":9,"Shrinkfilm":12}'
             ],
         ]);
     }

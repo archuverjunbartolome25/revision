@@ -35,7 +35,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 4,
                 'supplier_id' => 1,
-                'rawmat_id' => 4, // Plastic Bottle (1L)
+                'rawmat_id' => 3, // Plastic Bottle (1L)
                 'unit' => 'pieces',
                 'price' => 4.05,
                 'created_at' => Carbon::now(),
@@ -44,7 +44,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 5,
                 'supplier_id' => 1,
-                'rawmat_id' => 5, // Plastic Gallon (6L)
+                'rawmat_id' => 4, // Plastic Gallon (6L)
                 'unit' => 'pieces',
                 'price' => 23.00,
                 'created_at' => Carbon::now(),
@@ -53,7 +53,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 6,
                 'supplier_id' => 1,
-                'rawmat_id' => 6, // Blue Plastic Cap
+                'rawmat_id' => 5, // Blue Plastic Cap
                 'unit' => 'pieces',
                 'price' => 0.50,
                 'created_at' => Carbon::now(),
@@ -62,7 +62,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 8,
                 'supplier_id' => 1,
-                'rawmat_id' => 8, // Blue Plastic Cap (6L)
+                'rawmat_id' => 6, // Blue Plastic Cap (6L)
                 'unit' => 'pieces',
                 'price' => 3.00,
                 'created_at' => Carbon::now(),
@@ -73,7 +73,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 3,
                 'supplier_id' => 2,
-                'rawmat_id' => 3, // Plastic Bottle (500ml) - different rawmat_id
+                'rawmat_id' => 2, // Plastic Bottle (500ml) - different rawmat_id
                 'unit' => 'pieces',
                 'price' => 2.35,
                 'created_at' => Carbon::now(),
@@ -82,7 +82,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 7,
                 'supplier_id' => 2,
-                'rawmat_id' => 7, // Blue Plastic Cap - different rawmat_id
+                'rawmat_id' => 5, // Blue Plastic Cap - different rawmat_id
                 'unit' => 'pieces',
                 'price' => 0.49,
                 'created_at' => Carbon::now(),
@@ -93,9 +93,9 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 9,
                 'supplier_id' => 3,
-                'rawmat_id' => 9, // Label
+                'rawmat_id' => 7, // Label
                 'unit' => 'rolls',
-                'price' => 7960.00,
+                'price' => 0.20,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
@@ -104,9 +104,9 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 10,
                 'supplier_id' => 4,
-                'rawmat_id' => 10, // Label - different rawmat_id
+                'rawmat_id' => 7, // Label - different rawmat_id
                 'unit' => 'rolls',
-                'price' => 5960.00,
+                'price' => 0.60,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
@@ -115,7 +115,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 11,
                 'supplier_id' => 5,
-                'rawmat_id' => 11, // Stretchfilm
+                'rawmat_id' => 8, // Stretchfilm
                 'unit' => 'pieces',
                 'price' => 320.00,
                 'created_at' => Carbon::now(),
@@ -126,7 +126,7 @@ class SupplierOffersTableSeeder extends Seeder
             [
                 'id' => 12,
                 'supplier_id' => 6,
-                'rawmat_id' => 12, // Shrinkfilm
+                'rawmat_id' => 9, // Shrinkfilm
                 'unit' => 'pieces',
                 'price' => 2337.00,
                 'created_at' => Carbon::now(),
