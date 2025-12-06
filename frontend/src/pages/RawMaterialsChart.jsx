@@ -42,7 +42,8 @@ const RawMaterialsChart = () => {
 			const data = response.data.map((item) => {
 				return {
 					...item,
-					displayQuantity: formatNumber(item.quantity_pieces || 0), // ✅ always use quantity_pieces
+					quantityValue: Number(item.quantity_pieces || 0),
+					displayQuantity: formatNumber(item.quantity_pieces || 0),
 				};
 			});
 
@@ -56,7 +57,7 @@ const RawMaterialsChart = () => {
 	};
 
 	const getPointColor = (item) => {
-		const qty = item.displayQuantity;
+		const qty = item.quantityValue;
 		const lowStock = item.low_stock_alert || 0; // ✅ use low stock alert
 		const name = item.item?.toLowerCase();
 
@@ -94,7 +95,7 @@ const RawMaterialsChart = () => {
 		datasets: [
 			{
 				label: "Quantity",
-				data: items.map((item) => item.displayQuantity),
+				data: items.map((item) => item.quantityValue),
 				borderColor: "blue",
 				backgroundColor: items.map((item) => getPointColor(item)),
 				pointBorderColor: items.map((item) => getPointColor(item)),

@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\SalesOrder;
-use App\Models\Inventory;use Illuminate\Support\Facades\Log;
+use App\Models\Inventory;
 
-class ForecastController extends Controller
+class ForecastController extends Controller 
 {
     private function safeAlias($product)
     {
@@ -38,19 +38,20 @@ class ForecastController extends Controller
     public function historicalSales(Request $request)
     {
         try {
-            $productFilter = $request->input('product');
+            $productFilter = $request->input('product'); // e.g., '350ml', '500ml', '1L', '6L', or null for all
+            
+            // Get all unique product keys from the quantities JSONB column
             $allProducts = $this->getUniqueProductKeys();
             
             $query = SalesOrder::query()->selectRaw('DATE(date) AS date');
-    
+
             if ($productFilter && in_array($productFilter, $allProducts)) {
                 $alias = $this->safeAlias($productFilter);
-                // Use direct concatenation since we validated the input
-                $query->selectRaw("SUM((quantities->>'{$productFilter}')::int) AS qty_{$alias}");
+                $query->selectRaw("SUM((quantities::jsonb->>'{$productFilter}')::int) AS qty_{$alias}");
             } else {
                 foreach ($allProducts as $product) {
                     $alias = $this->safeAlias($product);
-                    $query->selectRaw("SUM((quantities->>'{$product}')::int) AS qty_{$alias}");
+                    $query->selectRaw("SUM((quantities::jsonb->>'{$product}')::int) AS qty_{$alias}");
                 }
             }
             
@@ -58,12 +59,12 @@ class ForecastController extends Controller
                 ->groupByRaw('DATE(date)')
                 ->orderBy('date')
                 ->get();
-    
+
             return response()->json([
                 'sales' => $sales,
                 'products' => $productFilter ? [$productFilter] : $allProducts
             ]);
-    
+
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to fetch historical sales data.',

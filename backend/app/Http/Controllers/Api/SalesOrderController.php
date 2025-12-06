@@ -670,33 +670,41 @@ public function markDelivered(Request $request, $id)
 public function mostSelling()
 {
     try {
-        $totals = \DB::table('sales_orders')
+        // Sum quantities inside JSONB
+        $totals = DB::table('sales_orders')
             ->selectRaw('
-                COALESCE(SUM("qty_350ml"), 0) as total_350ml,
-                COALESCE(SUM("qty_500ml"), 0) as total_500ml,
-                COALESCE(SUM("qty_1L"), 0) as total_1l,
-                COALESCE(SUM("qty_6L"), 0) as total_6l
+                COALESCE(SUM((quantities->>\'350ml\')::int), 0) AS total_350ml,
+                COALESCE(SUM((quantities->>\'500ml\')::int), 0) AS total_500ml,
+                COALESCE(SUM((quantities->>\'1L\')::int), 0)   AS total_1l,
+                COALESCE(SUM((quantities->>\'6L\')::int), 0)   AS total_6l
             ')
-            ->whereRaw('EXTRACT(MONTH FROM "date") = ?', [now()->month])
-            ->whereRaw('EXTRACT(YEAR FROM "date") = ?', [now()->year])
+            ->whereRaw('EXTRACT(MONTH FROM date) = ?', [now()->month])
+            ->whereRaw('EXTRACT(YEAR FROM date) = ?', [now()->year])
             ->first();
 
+        // Build product array
         $products = [
             "350ml" => $totals->total_350ml,
             "500ml" => $totals->total_500ml,
-            "1L"    => $totals->total_1l, // ✅ lowercase alias matches
+            "1L"    => $totals->total_1l,
             "6L"    => $totals->total_6l,
         ];
 
-        $topProduct = collect($products)->sortDesc()->keys()->first();
-        $topQty = $products[$topProduct];
+        // Convert to array format for frontend
+        $topProducts = collect($products)
+            ->map(function ($qty, $name) {
+                return [
+                    "product" => $name,
+                    "total_sales" => (int) $qty
+                ];
+            })
+            ->sortByDesc("total_sales")
+            ->values();
 
-return response()->json([
-    "success" => true,
-    "top_product" => $topProduct,
-    "total_sold" => number_format($topQty), // ✅ formats with thousands separator
-    "all_products" => collect($products)->map(fn($qty) => number_format($qty))
-]);
+        return response()->json([
+            "success" => true,
+            "top_products" => $topProducts
+        ]);
 
     } catch (\Exception $e) {
         return response()->json([
@@ -705,6 +713,7 @@ return response()->json([
         ], 500);
     }
 }
+
 public function topProducts()
 {
     $month = now()->month;

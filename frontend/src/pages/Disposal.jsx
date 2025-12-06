@@ -280,7 +280,7 @@ function Disposal() {
 						response.data.lastname || ""
 					}`.trim();
 					setUserFullName(fullName || "Unknown User");
-					setEmployeeID(response.data.id);
+					setEmployeeID(response.data.employee_id || storedEmployeeID);
 					setUserFirstName(response.data.firstname || "");
 					setRole(response.data.role || "");
 				}

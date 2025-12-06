@@ -653,7 +653,7 @@ function ReturnToVendor() {
 					</div>
 				</div>
 
-				<h2 className="topbar-title">RETURN TO VENDOR</h2>
+				<h2 className="topbar-title">RETURNS</h2>
 				<hr />
 				<div className="d-flex justify-content-between align-items-center mb-3 mt-3 flex-wrap">
 					<div className="d-flex gap-2">
