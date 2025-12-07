@@ -340,7 +340,7 @@ function InventoryReport() {
 
 	const [rawMatsUnitFilter, setRawMatsUnitFilter] = useState("All");
 	const [sortBy, setSortBy] = useState("totalUsedCost");
-	const [sortOrder, setSortOrder] = useState("asc");
+	const [sortOrder, setSortOrder] = useState("desc");
 
 	const filteredRawmatsAnalysis = rawMaterialAnalysis.filter((item) => {
 		if (
@@ -1193,7 +1193,7 @@ function InventoryReport() {
 					<input
 						type="text"
 						className="form-control"
-						style={{ width: "250px" }}
+						style={{ width: "150px" }}
 						placeholder="Search"
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
@@ -1228,7 +1228,7 @@ function InventoryReport() {
 					<select
 						className="form-select form-select-sm"
 						value={sortOrder}
-						style={{ width: "100px" }}
+						style={{ width: "250px" }}
 						onChange={(e) => setSortOrder(e.target.value)}
 					>
 						<option value="asc">Lowest to Highest</option>

@@ -1348,10 +1348,10 @@ function SalesReport() {
 
 					<hr />
 
-					<h2 className="topbar-title">Sold Products</h2>
+					{/* <h2 className="topbar-title">Sold Products</h2>
 					<div className="demand-card">
 						<SalesChart />
-					</div>
+					</div> */}
 				</div>
 			</div>
 

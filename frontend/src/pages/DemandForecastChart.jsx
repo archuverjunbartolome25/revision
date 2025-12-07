@@ -27,19 +27,10 @@ ChartJS.register(
 	ChartDataLabels
 );
 
-const safeAlias = (str) => {
-	return str
-		.toLowerCase()
-		.replace(/\s+/g, "_")
-		.replace(/[()]/g, "_")
-		.replace(/[^a-z0-9_]/g, "");
-};
-
 const DemandForecastChart = () => {
 	const [historical, setHistorical] = useState([]);
-	const [forecast, setForecast] = useState([]);
-	const [chartData, setChartData] = useState(null);
-
+	const [forecast1, setForecast1] = useState([]);
+	const [forecast2, setForecast2] = useState([]);
 	const [availableProducts, setAvailableProducts] = useState([]);
 	const [selectedProduct, setSelectedProduct] = useState("");
 	const [chartType, setChartType] = useState("line");
@@ -49,8 +40,8 @@ const DemandForecastChart = () => {
 	const [selectedMonth2, setSelectedMonth2] = useState(
 		new Date().getMonth() + 1
 	);
-	const [selectedYear1, setSelectedYear1] = useState(new Date().getFullYear());
-	const [selectedYear2, setSelectedYear2] = useState(
+	const [selectedYear2, setSelectedYear2] = useState(new Date().getFullYear());
+	const [selectedYear1, setSelectedYear1] = useState(
 		new Date().getFullYear() - 1
 	);
 	const [viewMode, setViewMode] = useState("year");
@@ -71,21 +62,18 @@ const DemandForecastChart = () => {
 		"December",
 	];
 
-	// Fetch available products
 	useEffect(() => {
 		axios
 			.get("http://localhost:8000/api/forecast/products")
 			.then((res) => {
 				const products = res.data.products || [];
 				setAvailableProducts(products);
-				if (products.length > 0 && !selectedProduct) {
+				if (products.length > 0 && !selectedProduct)
 					setSelectedProduct(products[0].item);
-				}
 			})
 			.catch((err) => console.error("Failed to fetch products:", err));
 	}, []);
 
-	// Fetch forecast/historical data
 	useEffect(() => {
 		if (!selectedProduct) return;
 
@@ -94,51 +82,56 @@ const DemandForecastChart = () => {
 				params: { product: selectedProduct, days: 365, avg_period: 7 },
 			})
 			.then((res) => {
-				const forecasts = Object.values(res.data.forecast);
-				const historicalData = forecasts[0]?.historical || [];
+				const forecasts = Object.values(res.data.forecast)[0] || {};
+				const historicalData = forecasts.historical || [];
+				const futureData = forecasts.future || [];
 
-				// Set historical (actual + predicted)
 				setHistorical(historicalData);
 
-				// Set forecast (predicted_qty only)
-				setForecast(
-					historicalData.map((h) => ({
-						date: h.date,
-						predicted_qty: h.predicted_qty,
-					}))
+				const currentYear = new Date().getFullYear();
+
+				setForecast1(
+					(selectedYear1 > currentYear ? futureData : historicalData).map(
+						(h) => ({
+							date: h.date,
+							predicted_qty: h.predicted_qty,
+						})
+					)
 				);
 
-				setLoading(false);
+				setForecast2(
+					(selectedYear2 > currentYear ? futureData : historicalData).map(
+						(h) => ({
+							date: h.date,
+							predicted_qty: h.predicted_qty,
+						})
+					)
+				);
 			})
 			.catch((err) => console.error("Forecast error:", err));
-	}, [selectedProduct]);
+	}, [selectedProduct, selectedYear1, selectedYear2]);
 
-	// Helpers
-	const getHistoricalTotal = (product, filterFn) => {
-		if (!historical) return 0;
-		return historical
+	// Helpers for historical & forecast totals
+	const getHistoricalTotal = (filterFn) =>
+		historical
 			.filter(filterFn)
 			.reduce((sum, f) => sum + (f.actual_qty || 0), 0);
-	};
-
-	const getForecastTotal = (product, filterFn) => {
-		if (!forecast) return 0;
-		return forecast
+	const getForecastTotal = (forecast) => (filterFn) =>
+		forecast
 			.filter(filterFn)
 			.reduce((sum, f) => sum + (f.predicted_qty || 0), 0);
-	};
 
 	const computeMonthData = (
 		year,
 		month,
+		forecastData,
 		colors = { hist: "blue", fore: "green" }
 	) => {
 		const labels = ["Prev", "Current", "Next"].map(
 			(_, i) => months[(month + i - 2 + 12) % 12]
 		);
-
 		const historicalData = labels.map((_, i) =>
-			getHistoricalTotal(selectedProduct, (f) => {
+			getHistoricalTotal((f) => {
 				const d = new Date(f.date);
 				return (
 					d.getFullYear() === year &&
@@ -146,9 +139,8 @@ const DemandForecastChart = () => {
 				);
 			})
 		);
-
-		const forecastData = labels.map((_, i) =>
-			getForecastTotal(selectedProduct, (f) => {
+		const forecastValues = labels.map((_, i) =>
+			getForecastTotal(forecastData)((f) => {
 				const d = new Date(f.date);
 				return (
 					d.getFullYear() === year &&
@@ -156,7 +148,6 @@ const DemandForecastChart = () => {
 				);
 			})
 		);
-
 		return {
 			labels,
 			datasets: [
@@ -170,7 +161,7 @@ const DemandForecastChart = () => {
 				},
 				{
 					label: `${selectedProduct} Forecast`,
-					data: forecastData,
+					data: forecastValues,
 					backgroundColor: colors.fore,
 					borderColor: colors.fore,
 					borderDash: chartType === "line" ? [5, 5] : [],
@@ -181,13 +172,17 @@ const DemandForecastChart = () => {
 		};
 	};
 
-	const computeYearData = (year, colors = { hist: "blue", fore: "green" }) => ({
+	const computeYearData = (
+		year,
+		forecastData,
+		colors = { hist: "blue", fore: "green" }
+	) => ({
 		labels: months,
 		datasets: [
 			{
 				label: `${selectedProduct} Historical`,
 				data: months.map((_, i) =>
-					getHistoricalTotal(selectedProduct, (f) => {
+					getHistoricalTotal((f) => {
 						const d = new Date(f.date);
 						return d.getFullYear() === year && d.getMonth() + 1 === i + 1;
 					})
@@ -200,7 +195,7 @@ const DemandForecastChart = () => {
 			{
 				label: `${selectedProduct} Forecast`,
 				data: months.map((_, i) =>
-					getForecastTotal(selectedProduct, (f) => {
+					getForecastTotal(forecastData)((f) => {
 						const d = new Date(f.date);
 						return d.getFullYear() === year && d.getMonth() + 1 === i + 1;
 					})
@@ -214,16 +209,63 @@ const DemandForecastChart = () => {
 		],
 	});
 
+	const computeQuarterData = (
+		year,
+		forecastData,
+		colors = { hist: "blue", fore: "green" }
+	) => {
+		const quarters = ["Q1", "Q2", "Q3", "Q4"];
+		const historicalData = [0, 1, 2, 3].map((q) =>
+			getHistoricalTotal((f) => {
+				const d = new Date(f.date);
+				return (
+					d.getFullYear() === year &&
+					d.getMonth() + 1 >= q * 3 + 1 &&
+					d.getMonth() + 1 <= q * 3 + 3
+				);
+			})
+		);
+		const forecastValues = [0, 1, 2, 3].map((q) =>
+			getForecastTotal(forecastData)((f) => {
+				const d = new Date(f.date);
+				return (
+					d.getFullYear() === year &&
+					d.getMonth() + 1 >= q * 3 + 1 &&
+					d.getMonth() + 1 <= q * 3 + 3
+				);
+			})
+		);
+		return {
+			labels: quarters,
+			datasets: [
+				{
+					label: `${selectedProduct} Historical`,
+					data: historicalData,
+					backgroundColor: colors.hist,
+					borderColor: colors.hist,
+					borderWidth: 2,
+					pointHoverRadius: 7,
+				},
+				{
+					label: `${selectedProduct} Forecast`,
+					data: forecastValues,
+					backgroundColor: colors.fore,
+					borderColor: colors.fore,
+					borderDash: chartType === "line" ? [5, 5] : [],
+					borderWidth: 2,
+					pointHoverRadius: 7,
+				},
+			],
+		};
+	};
+
 	const options = {
 		responsive: true,
 		plugins: {
 			legend: { display: true, position: "top" },
 			title: {
 				display: true,
-				text:
-					viewMode === "month"
-						? `(Month View) Demand vs Forecast - ${selectedProduct}`
-						: `(Year View) Demand vs Forecast - ${selectedProduct}`,
+				text: `(Demand vs Forecast) - ${selectedProduct}`,
 				font: { size: 18 },
 			},
 			datalabels: { display: false },
@@ -233,22 +275,29 @@ const DemandForecastChart = () => {
 
 	const chart1Data =
 		viewMode === "month"
-			? computeMonthData(selectedYear1, selectedMonth1)
-			: computeYearData(selectedYear1);
+			? computeMonthData(selectedYear1, selectedMonth1, forecast1)
+			: viewMode === "quarter"
+			? computeQuarterData(selectedYear1, forecast1)
+			: computeYearData(selectedYear1, forecast1);
 
 	const chart2Data =
 		viewMode === "month"
-			? computeMonthData(selectedYear2, selectedMonth2, {
+			? computeMonthData(selectedYear2, selectedMonth2, forecast2, {
 					hist: "orange",
 					fore: "purple",
 			  })
-			: computeYearData(selectedYear2, { hist: "orange", fore: "purple" });
-
-	if (loading) return <div className="text-center p-5">Loading data...</div>;
+			: viewMode === "quarter"
+			? computeQuarterData(selectedYear2, forecast2, {
+					hist: "orange",
+					fore: "purple",
+			  })
+			: computeYearData(selectedYear2, forecast2, {
+					hist: "orange",
+					fore: "purple",
+			  });
 
 	return (
 		<div>
-			{/* Controls */}
 			<div className="d-flex gap-3 mb-3">
 				<div>
 					<label className="me-2 fw-bold">Product:</label>
@@ -257,9 +306,9 @@ const DemandForecastChart = () => {
 						onChange={(e) => setSelectedProduct(e.target.value)}
 						className="custom-select w-auto d-inline-block"
 					>
-						{availableProducts.map((product) => (
-							<option key={product.id} value={product.item}>
-								{product.item} ({product.unit})
+						{availableProducts.map((p) => (
+							<option key={p.id} value={p.item}>
+								{p.item} ({p.unit})
 							</option>
 						))}
 					</select>
@@ -273,6 +322,7 @@ const DemandForecastChart = () => {
 					>
 						<option value="year">Year View</option>
 						<option value="month">Month View</option>
+						<option value="quarter">Quarter View</option>
 					</select>
 				</div>
 				<div>
@@ -300,34 +350,32 @@ const DemandForecastChart = () => {
 			>
 				{/* Chart 1 */}
 				<div>
-					<div className="d-flex gap-2 mb-2">
-						{viewMode === "month" && (
-							<div className="d-flex gap-2 mb-2">
-								<label className="fw-bold">Month:</label>
-								<select
-									value={selectedMonth1}
-									onChange={(e) => setSelectedMonth1(parseInt(e.target.value))}
-									className="form-control w-auto"
-								>
-									{months.map((m, i) => (
-										<option key={i} value={i + 1}>
-											{m}
-										</option>
-									))}
-								</select>
-							</div>
-						)}
+					{viewMode === "month" && (
 						<div className="d-flex gap-2 mb-2">
-							<label className="fw-bold">Year:</label>
-							<input
-								type="number"
-								min="2000"
-								max="2100"
-								value={selectedYear1}
-								onChange={(e) => setSelectedYear1(parseInt(e.target.value))}
+							<label className="fw-bold">Month:</label>
+							<select
+								value={selectedMonth1}
+								onChange={(e) => setSelectedMonth1(parseInt(e.target.value))}
 								className="form-control w-auto"
-							/>
+							>
+								{months.map((m, i) => (
+									<option key={i} value={i + 1}>
+										{m}
+									</option>
+								))}
+							</select>
 						</div>
+					)}
+					<div className="d-flex gap-2 mb-2">
+						<label className="fw-bold">Year:</label>
+						<input
+							type="number"
+							min="2000"
+							max="2100"
+							value={selectedYear1}
+							onChange={(e) => setSelectedYear1(parseInt(e.target.value))}
+							className="form-control w-auto"
+						/>
 					</div>
 					<div style={{ width: "600px", height: "600px" }}>
 						{chartType === "bar" ? (
@@ -348,34 +396,32 @@ const DemandForecastChart = () => {
 
 				{/* Chart 2 */}
 				<div>
-					<div className="d-flex gap-2 mb-2">
-						{viewMode === "month" && (
-							<div className="d-flex gap-2 mb-2">
-								<label className="fw-bold">Month:</label>
-								<select
-									value={selectedMonth2}
-									onChange={(e) => setSelectedMonth2(parseInt(e.target.value))}
-									className="form-control w-auto"
-								>
-									{months.map((m, i) => (
-										<option key={i} value={i + 1}>
-											{m}
-										</option>
-									))}
-								</select>
-							</div>
-						)}
+					{viewMode === "month" && (
 						<div className="d-flex gap-2 mb-2">
-							<label className="fw-bold">Year:</label>
-							<input
-								type="number"
-								min="2000"
-								max="2100"
-								value={selectedYear2}
-								onChange={(e) => setSelectedYear2(parseInt(e.target.value))}
+							<label className="fw-bold">Month:</label>
+							<select
+								value={selectedMonth2}
+								onChange={(e) => setSelectedMonth2(parseInt(e.target.value))}
 								className="form-control w-auto"
-							/>
+							>
+								{months.map((m, i) => (
+									<option key={i} value={i + 1}>
+										{m}
+									</option>
+								))}
+							</select>
 						</div>
+					)}
+					<div className="d-flex gap-2 mb-2">
+						<label className="fw-bold">Year:</label>
+						<input
+							type="number"
+							min="2000"
+							max="2100"
+							value={selectedYear2}
+							onChange={(e) => setSelectedYear2(parseInt(e.target.value))}
+							className="form-control w-auto"
+						/>
 					</div>
 					<div style={{ width: "600px", height: "600px" }}>
 						{chartType === "bar" ? (
