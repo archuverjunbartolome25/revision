@@ -155,7 +155,7 @@
       <thead>
         <tr>
           <th>Item Description</th>
-          <th>Quantity</th>
+          <th>Quantity (Unit)</th>
           <th>Unit Price</th>
           <th>Total Price</th>
         </tr>
@@ -164,7 +164,7 @@
         @foreach($items as $item)
           <tr>
               <td>{{ $item['product'] }}</td>
-              <td class="text-center">{{ $item['quantity'] }}</td>
+              <td class="text-center">{{ $item['quantity'] }} {{ $item['unit'] }}</td>
               <td>₱{{ number_format($item['unit_price'], 2) }}</td>
               <td>₱{{ number_format($item['total_price'], 2) }}</td>
           </tr>

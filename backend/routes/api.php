@@ -240,6 +240,7 @@ Route::get('disposals/pdf', [ReportController::class, 'disposalReportPDF'])->nam
 Route::get('/return-to-vendor/pdf', [ReportController::class, 'returnToVendorReportPDF']);
 Route::get('purchase-order-report-pdf', [ReportController::class, 'purchaseOrderReportPDF']);
 
+
 // ============================
 // FILE UPLOAD
 // ============================
@@ -269,9 +270,9 @@ Route::post('inventories/restore/{id}', [InventoryController::class, 'restore'])
 
 // *  NEW ENDPOINTS
 Route::get('/finished-goods', [InventoryController::class, 'getAllFinishedGoods']);
-
-
 Route::get('reports/stat-analysis', [ReportController::class, 'topCustomers']);
+Route::get('reports/raw-materials-analysis', [ReportController::class, 'getRawMaterialsAnalysis']);
+
 
 
 

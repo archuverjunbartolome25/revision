@@ -29,24 +29,6 @@ import { formatNumber, formatToPeso } from "../helpers/formatNumber";
 function InventoryReport() {
 	const [employees, setEmployees] = useState({});
 
-	useEffect(() => {
-		const fetchEmployees = async () => {
-			try {
-				const res = await axios.get("http://localhost:8000/api/users");
-				// Create a map: { "1": "E072501", "2": "E072502", ... }
-				const map = {};
-				res.data.forEach((user) => {
-					map[user.id] = user.employeeID; // or employee_code if that’s the field
-				});
-				setEmployees(map);
-			} catch (error) {
-				console.error(error);
-			}
-		};
-
-		fetchEmployees();
-	}, []);
-
 	const roles = {
 		dashboard: [
 			"Inventory Custodian",
@@ -140,8 +122,10 @@ function InventoryReport() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [logCurrentPage, setLogCurrentPage] = useState(1);
 	const [auditLogCurrentPage, setAuditLogCurrentPage] = useState(1);
-	const logItemsPerPage = 8;
+	const logItemsPerPage = 4;
 	const [currentPage, setCurrentPage] = useState(1);
+	const [rawMatsCurrentPage, setRawamtsCurrentPage] = useState(1);
+
 	const itemsPerPage = 6;
 	const [userFullName, setUserFullName] = useState("");
 	const [employeeID, setEmployeeID] = useState("");
@@ -152,9 +136,10 @@ function InventoryReport() {
 	const [inventory, setInventory] = useState([]);
 	const [rawMats, setRawMats] = useState([]);
 	const [supplierFilter, setSupplierFilter] = useState("All");
-
 	const [stockNotifications, setStockNotifications] = useState([]);
 	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+	const [rawMaterialAnalysis, setRawMaterialAnalysis] = useState([]);
 
 	const isReportsActive = location.pathname.startsWith("/reports");
 
@@ -172,34 +157,81 @@ function InventoryReport() {
 		}
 	};
 
-	// ✅ Fetch inventory data
-	useEffect(() => {
-		const fetchInventoryData = async () => {
-			setLoading(true);
-			try {
-				const [finished, raw] = await Promise.all([
-					axios.get("http://localhost:8000/api/inventories"),
-					axios.get("http://localhost:8000/api/inventory_rawmats"),
-				]);
+	const fetchEmployees = async () => {
+		try {
+			const res = await axios.get("http://localhost:8000/api/users");
+			// Create a map: { "1": "E072501", "2": "E072502", ... }
+			const map = {};
+			res.data.forEach((user) => {
+				map[user.id] = user.employeeID; // or employee_code if that’s the field
+			});
+			setEmployees(map);
+		} catch (error) {
+			console.error(error);
+		}
+	};
 
-				const combined = [
-					...finished.data.map((item) => ({ ...item, type: "Finished Goods" })),
-					...raw.data.map((item) => ({ ...item, type: "Raw Material" })),
-				];
+	const fetchLogs = async () => {
+		try {
+			const response = await axios.get(
+				"http://localhost:8000/api/inventory-activity-logs"
+			);
 
-				setInventoryData(combined);
-				setInventory(finished.data || []);
-				setRawMats(raw.data || []);
-			} catch (error) {
-				console.error("❌ Error fetching inventory data:", error);
-			} finally {
-				setLoading(false);
-			}
-		};
+			setActivityLogs(response.data.data); // <- use .data here
+		} catch (error) {
+			console.error("Error fetching activity logs:", error);
+		}
+	};
 
-		fetchNotification();
-		fetchInventoryData();
-	}, []);
+	const fetchRawMaterialAnalysis = async () => {
+		setLoading(true);
+		try {
+			// ?days=60&forecast_days=30&lead_time=7&min_price=100
+
+			const response = await axios.get(
+				`http://localhost:8000/api/reports/raw-materials-analysis`
+			);
+
+			setRawMaterialAnalysis(response.data.data);
+		} catch (error) {
+			console.error("❌ Error fetching raw mats analysis data:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const fetchInventoryData = async () => {
+		setLoading(true);
+		try {
+			const [finished, raw] = await Promise.all([
+				axios.get("http://localhost:8000/api/inventories"),
+				axios.get("http://localhost:8000/api/inventory_rawmats"),
+			]);
+
+			const combined = [
+				...finished.data.map((item) => ({ ...item, type: "Finished Goods" })),
+				...raw.data.map((item) => ({ ...item, type: "Raw Material" })),
+			];
+
+			setInventoryData(combined);
+			setInventory(finished.data || []);
+			setRawMats(raw.data || []);
+		} catch (error) {
+			console.error("❌ Error fetching inventory data:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const fetchAuditLogs = async () => {
+		try {
+			const response = await axios.get("http://localhost:8000/api/audit-logs");
+
+			setAuditLogs(response.data.data); // <- use .data here
+		} catch (error) {
+			console.error("Error fetching audit logs:", error);
+		}
+	};
 
 	// ✅ Fetch logged-in user info
 	useEffect(() => {
@@ -233,9 +265,15 @@ function InventoryReport() {
 		} else {
 			console.warn("⚠️ No valid employeeID found in localStorage.");
 		}
+
+		fetchNotification();
+		fetchInventoryData();
+		fetchEmployees();
+		fetchLogs();
+		fetchAuditLogs();
+		fetchRawMaterialAnalysis();
 	}, []);
 
-	// ✅ Sort first, then filter by type & search
 	const orderedRawMats = [
 		"Plastic Bottle (350ml)",
 		"Plastic Bottle (500ml) Mc Bride Corporation",
@@ -300,18 +338,70 @@ function InventoryReport() {
 
 	const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
+	const [rawMatsUnitFilter, setRawMatsUnitFilter] = useState("All");
+	const [sortBy, setSortBy] = useState("totalUsedCost");
+	const [sortOrder, setSortOrder] = useState("asc");
+
+	const filteredRawmatsAnalysis = rawMaterialAnalysis.filter((item) => {
+		if (
+			rawMatsUnitFilter &&
+			rawMatsUnitFilter !== "All" &&
+			item.unit !== rawMatsUnitFilter
+		)
+			return false;
+
+		// Search filter
+		if (searchTerm.trim() !== "") {
+			const term = searchTerm.toLowerCase();
+			if (!item.item.toLowerCase().includes(term)) return false;
+		}
+
+		return true; // include item if all conditions pass
+	});
+
+	const sortedRawmatsAnalysis = filteredRawmatsAnalysis.sort((a, b) => {
+		let valA, valB;
+
+		switch (sortBy) {
+			case "totalUsedCost":
+				valA = Number(a.supplier_unit_price) * a.total_used_pieces;
+				valB = Number(b.supplier_unit_price) * b.total_used_pieces;
+				break;
+			case "totalUsedPieces":
+				valA = a.total_used_pieces;
+				valB = b.total_used_pieces;
+				break;
+			default:
+				return 0; // no sorting
+		}
+
+		return sortOrder === "asc" ? valA - valB : valB - valA;
+	});
+
+	const unitOptions = Array.from(
+		new Set(rawMaterialAnalysis.map((item) => item.unit))
+	);
+
+	// Pagination logic
+	const rawMatsIndexOfLastItem = rawMatsCurrentPage * itemsPerPage;
+	const rawMatsindexOfFirstItem = rawMatsIndexOfLastItem - itemsPerPage;
+	const rawMatsCurrentItems = sortedRawmatsAnalysis.slice(
+		rawMatsindexOfFirstItem,
+		rawMatsIndexOfLastItem
+	);
+
+	const rawMatsTotalPages = Math.ceil(
+		rawMatsCurrentItems.length / itemsPerPage
+	);
+
 	const [activityLogs, setActivityLogs] = useState([]);
 	const [auditLogs, setAuditLogs] = useState([]);
 
 	// Add filter states at the top
 	const [logSearch, setLogSearch] = useState("");
-	const [auditLogSearch, setAuditLogSearchSearch] = useState("");
 	const [logType, setLogType] = useState("All"); // Finished Goods / Raw Materials / All
-	const [auditLogType, setAuditLogType] = useState("All"); // Finished Goods / Raw Materials / All
 	const [logProcess, setLogProcess] = useState("All");
-	const [auditLogProcess, setAuditLogProcess] = useState("All");
 	const [logDate, setLogDate] = useState(""); // yyyy-mm-dd format
-	const [auditLogDate, setAuditLogDate] = useState(""); // yyyy-mm-dd format
 
 	const processMap = {
 		sales_order: "Sales Order",
@@ -357,75 +447,13 @@ function InventoryReport() {
 	);
 	const logTotalPages = Math.ceil(filteredLogs.length / logItemsPerPage);
 
-	const filteredAuditLogs = activityLogs.filter((log) => {
-		const logDateStr = new Date(log.processed_at?.replace(" ", "T"))
-			.toISOString()
-			.split("T")[0];
-
-		// Filter by search (item name or employee)
-		const matchesSearch =
-			log.item_name.toLowerCase().includes(logSearch.toLowerCase()) ||
-			(employees[log.employee_id] || log.employee_id)
-				.toLowerCase()
-				.includes(logSearch.toLowerCase());
-
-		// Filter by type
-		const matchesType = logType === "All" ? true : log.type === logType;
-
-		// Filter by process
-		const matchesProcess =
-			logProcess === "All"
-				? true
-				: (processMap[log.module] || log.module || "").toLowerCase() ===
-				  logProcess.toLowerCase();
-
-		// Filter by date
-		const matchesDate = logDate ? logDateStr === logDate : true;
-
-		return matchesSearch && matchesType && matchesProcess && matchesDate;
-	});
-
-	const auditLogIndexOfLastItem = logCurrentPage * logItemsPerPage;
-	const auditLogIndexOfFirstItem = logIndexOfLastItem - logItemsPerPage;
-	const currentAuditLogs = filteredAuditLogs.slice(
+	const auditLogIndexOfLastItem = auditLogCurrentPage * logItemsPerPage;
+	const auditLogIndexOfFirstItem = auditLogIndexOfLastItem - logItemsPerPage;
+	const currentAuditLogs = auditLogs.slice(
 		auditLogIndexOfFirstItem,
 		auditLogIndexOfLastItem
 	);
-	const auditLogTotalPages = Math.ceil(
-		filteredAuditLogs.length / logItemsPerPage
-	);
-
-	useEffect(() => {
-		const fetchLogs = async () => {
-			try {
-				const response = await axios.get(
-					"http://localhost:8000/api/inventory-activity-logs"
-				);
-
-				setActivityLogs(response.data.data); // <- use .data here
-			} catch (error) {
-				console.error("Error fetching activity logs:", error);
-			}
-		};
-
-		fetchLogs();
-	}, []);
-
-	useEffect(() => {
-		const fetchAuditLogs = async () => {
-			try {
-				const response = await axios.get(
-					"http://localhost:8000/api/audit-logs"
-				);
-				setAuditLogs(response.data.data); // <- use .data here
-			} catch (error) {
-				console.error("Error fetching audit logs:", error);
-			}
-		};
-
-		fetchAuditLogs();
-	}, []);
-
+	const auditLogTotalPages = Math.ceil(auditLogs.length / logItemsPerPage);
 	const itemDisplayNames = {
 		"350ml": "Bottled Water (350ml)",
 		"500ml": "Bottled Water (500ml)",
@@ -442,7 +470,6 @@ function InventoryReport() {
 		Shrinkfilm: "Shrinkfilm",
 	};
 
-	console.log(auditLogs);
 	return (
 		<div
 			className={`dashboard-container ${
@@ -700,6 +727,7 @@ function InventoryReport() {
 					</select>
 				</div>
 				<hr />
+
 				<h2 className="topbar-title">Inventory Report</h2>
 				<hr />
 
@@ -974,8 +1002,8 @@ function InventoryReport() {
 									<th>Type</th>
 									<th>Item Name</th>
 									<th>Previous Quantity (pcs)</th>
-									<th>Quantity (pcs)</th>
-									<th>Total Quantity (pcs)</th>
+									<th>Transaction Quantity (pcs)</th>
+									<th>New Quantity (pcs)</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -1070,56 +1098,7 @@ function InventoryReport() {
 				<hr />
 
 				<h2 className="topbar-title">Audit Log</h2>
-				<div className="d-flex gap-2 align-items-center mb-2">
-					<input
-						type="text"
-						placeholder="Search by item or employee"
-						className="form-control"
-						value={auditLogSearch}
-						onChange={(e) => setAuditLogSearch(e.target.value)}
-						style={{ width: "200px" }}
-					/>
 
-					<div className="flex gap-0">
-						<input
-							type="date"
-							className="form-control rounded-end-0"
-							style={{ width: "150px" }}
-							value={auditLogDate}
-							max={new Date().toISOString().split("T")[0]}
-							onChange={(e) => setAuditLogDate(e.target.value)}
-						/>
-						<button
-							className="btn btn-sm btn-secondary rounded-start-0"
-							onClick={() => setAuditLogDate("")}
-							disabled={!auditLogDate}
-						>
-							View All
-						</button>
-					</div>
-
-					<select
-						className="custom-select"
-						value={auditLogType}
-						onChange={(e) => setAuditLogType(e.target.value)}
-					>
-						<option value="All">All Types</option>
-						<option value="Finished Goods">Finished Goods</option>
-						<option value="Raw Materials">Raw Materials</option>
-					</select>
-					<select
-						className="custom-select"
-						value={auditLogProcess}
-						onChange={(e) => setLogProcess(e.target.value)}
-					>
-						<option value="All">All Processes</option>
-						{Object.values(processMap).map((proc) => (
-							<option key={proc} value={proc}>
-								{proc}
-							</option>
-						))}
-					</select>
-				</div>
 				<div className="topbar-inventory-box mt-2">
 					<div className="table-responsive">
 						<table className="custom-table">
@@ -1135,8 +1114,8 @@ function InventoryReport() {
 								</tr>
 							</thead>
 							<tbody>
-								{auditLogs.length > 0 ? (
-									auditLogs.map((log, index) => {
+								{currentAuditLogs.length > 0 ? (
+									currentAuditLogs.map((log, index) => {
 										function formatToMDY(datetime) {
 											if (!datetime) return "";
 
@@ -1152,11 +1131,11 @@ function InventoryReport() {
 
 										return (
 											<tr key={index}>
-												<td>{log.creator.employeeID}</td>
+												<td>{log.creator?.employeeID}</td>
 												<td>{formatToMDY(log.created_at)}</td>
 												<td>{log.module}</td>
 												<td>{log.action}</td>
-												<td>{log.performer.employeeID}</td>
+												<td>{log.performer?.employeeID}</td>
 												<td>{formatToMDY(log.updated_at)}</td>
 												<td>{log.status}</td>
 											</tr>
@@ -1182,19 +1161,198 @@ function InventoryReport() {
 								>
 									← Previous
 								</button>
+
 								<small>
-									Page {auditLogCurrentPage} of {auditLogCurrentPage}
+									Page {auditLogCurrentPage} of {auditLogTotalPages}
 								</small>
+
 								<button
 									className="btn btn-sm btn-light"
 									onClick={() =>
 										setAuditLogCurrentPage((prev) =>
-											Math.min(prev + 1, auditLogCurrentPage)
+											Math.min(prev + 1, auditLogTotalPages)
+										)
+									}
+									disabled={auditLogCurrentPage === auditLogTotalPages}
+								>
+									Next →
+								</button>
+							</div>
+						)}
+					</div>
+				</div>
+
+				<hr />
+
+				{/* RAW MATS ANALYSIS */}
+				<h2 className="topbar-title">
+					Raw Materials Analysis (30 days period)
+				</h2>
+
+				<div className="d-flex align-items-center gap-2 mb-2">
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search"
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+					/>
+					<label className="fw-bold me-2">Filter by unit:</label>
+
+					<select
+						className="form-select form-select-sm"
+						style={{ width: "250px" }}
+						onChange={(e) => setRawMatsUnitFilter(e.target.value)}
+						value={rawMatsUnitFilter}
+					>
+						<option value="All">All</option>
+						{unitOptions.map((unit, index) => (
+							<option key={index} value={unit}>
+								{unit}
+							</option>
+						))}
+					</select>
+
+					<select
+						className="form-select form-select-sm"
+						value={sortBy}
+						style={{ width: "250px" }}
+						onChange={(e) => setSortBy(e.target.value)}
+					>
+						<option value="">Sort By</option>
+						<option value="totalUsedCost">Sort by total used cost</option>
+						<option value="totalUsedPieces">Sort by total used pieces</option>
+					</select>
+
+					<select
+						className="form-select form-select-sm"
+						value={sortOrder}
+						style={{ width: "100px" }}
+						onChange={(e) => setSortOrder(e.target.value)}
+					>
+						<option value="asc">Lowest to Highest</option>
+						<option value="desc">Highest to Lowest</option>
+					</select>
+				</div>
+
+				<div className="topbar-inventory-box mt-2">
+					<div
+						className="table-responsive"
+						style={{
+							overflowX: "auto",
+							overflowY: "hidden",
+						}}
+					>
+						<table className="custom-table">
+							<thead>
+								<tr>
+									<th>Raw Material</th>
+									<th>Total Cost Used</th>
+									<th>Total Quantity Used</th>
+									<th>Unit</th>
+									<th>Current Stock</th>
+									<th>Avg Daily Demand</th>
+									<th>Forecast Demand </th>
+									<th>Leadtime Demand </th>
+									<th>Reorder Point</th>
+									<th>Stockout Risk </th>
+									<th>Reorder Needed </th>
+								</tr>
+							</thead>
+							<tbody>
+								{sortedRawmatsAnalysis.map((item, index) => (
+									<tr key={index}>
+										<td>{item.item}</td>
+
+										<td>
+											{formatToPeso(
+												Number(item.supplier_unit_price) *
+													item.total_used_pieces
+											)}
+										</td>
+										<td>{formatNumber(item.total_used_pieces)}</td>
+										<td>{item.unit}</td>
+
+										<td>
+											{formatNumber(Math.round(item.current_stock_pieces))} pcs
+											<div className="progress mt-1" style={{ height: "5px" }}>
+												<div
+													className={`progress-bar ${
+														item.current_stock_pieces <
+														item.reorder_point_pieces
+															? "bg-danger"
+															: "bg-success"
+													}`}
+													role="progressbar"
+													style={{
+														width: `${Math.min(
+															(Math.round(item.current_stock_pieces) /
+																Math.round(item.reorder_point_pieces)) *
+																100,
+															100
+														)}%`,
+													}}
+												></div>
+											</div>
+										</td>
+										<td>{Math.round(item.avg_daily_demand)} pcs/day</td>
+										<td>{Math.round(item.forecast_demand_pieces)} pcs</td>
+										<td>{Math.round(item.lead_time_demand_pieces)} pcs</td>
+										<td>
+											{formatNumber(Math.round(item.reorder_point_pieces))} pcs
+										</td>
+										<td
+											className={
+												item.stockout_risk_pieces < 0
+													? "text-danger fw-bold"
+													: ""
+											}
+										>
+											{formatNumber(Math.round(item.stockout_risk_pieces))} pcs
+										</td>
+										<td>
+											{item.reorder_needed ? (
+												<span
+													className="badge bg-success"
+													title="Stock below reorder point"
+												>
+													Yes
+												</span>
+											) : (
+												<span className="badge bg-danger">No</span>
+											)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+						{rawMatsTotalPages > 1 && (
+							<div className="d-flex justify-content-between align-items-center mt-2 gap-2">
+								<button
+									className="btn btn-sm btn-light"
+									onClick={() =>
+										setRawamtsCurrentPage((prev) => Math.max(prev - 1, 1))
+									}
+									disabled={rawMatsCurrentPage === 1}
+								>
+									← Previous
+								</button>
+
+								<small>
+									Page {rawMatsCurrentPage} of {rawMatsTotalPages}
+								</small>
+
+								<button
+									className="btn btn-sm btn-light"
+									onClick={() =>
+										setRawamtsCurrentPage((prev) =>
+											Math.min(prev + 1, rawMatsTotalPages)
 										)
 									}
 									disabled={
-										auditLogCurrentPage === auditLogCurrentPage ||
-										auditLogTotalPages === 0
+										rawmatsCurrentPage === rawMatsTotalPages ||
+										rawMatsTotalPages === 0
 									}
 								>
 									Next →

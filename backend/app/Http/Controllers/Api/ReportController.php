@@ -9,32 +9,152 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use App\Models\SalesOrder;
+use App\Models\InventoryRawMat;
+use App\Models\Inventory;
 
 class ReportController extends Controller
 {
 
     // *NEW
+    // public function salesReport(Request $request)
+    // {
+    //     // Fetch inventory
+    //     $inventoryMap = DB::table('inventories')
+    //         ->select('item', 'unit_cost as selling_price', 'selected_materials', 'pcs_per_unit')
+    //         ->get()
+    //         ->keyBy('item');
+    
+    //     // Fetch supplier offers WITH raw material conversion
+    //     $supplierOffersMap = DB::table('supplier_offers as so')
+    //         ->join('inventory_rawmats as rm', 'so.rawmat_id', '=', 'rm.id')
+    //         ->select(
+    //             'so.id', 
+    //             'so.price', 
+    //             'rm.conversion',  // ← Field that contains qty per unit
+    //             'rm.item as rawmat_name'
+    //         )
+    //         ->get()
+    //         ->keyBy('id');
+    
+    //     Log::info("Supplier Offers with Raw Materials:", $supplierOffersMap->toArray());
+    
+    //     $salesOrders = DB::table('sales_orders as so')
+    //         ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
+    //         ->select(
+    //             'so.id',
+    //             'so.location',
+    //             'so.date',
+    //             'so.products',
+    //             'so.delivery_date',
+    //             'so.date_delivered',
+    //             'so.status',
+    //             'so.order_type',
+    //             'so.amount as total_sales',
+    //             'so.quantities',
+    //             'c.name as customer_name'
+    //         )
+    //         ->orderBy('so.date', 'desc')
+    //         ->get()
+    //         ->map(function ($order) use ($inventoryMap, $supplierOffersMap) {
+    
+    //             $quantities = json_decode($order->quantities, true) ?? [];
+    //             $cogs = 0;
+    //             $totalQty = 0;
+    
+    //             Log::info("=== Order {$order->id} ===");
+    
+    //             foreach ($quantities as $productName => $casesSold) {
+    //                 $casesSold = (int)$casesSold;
+    //                 $totalQty += $casesSold;
+    
+    //                 $inventory = $inventoryMap->get($productName);
+    
+    //                 if (!$inventory) {
+    //                     Log::warning("No inventory for: $productName");
+    //                     continue;
+    //                 }
+    
+    //                 Log::info("Product: $productName | Cases Sold: $casesSold");
+                    
+    //                 $selectedMaterials = json_decode($inventory->selected_materials, true) ?? [];
+    //                 $productionCostPerCase = 0;
+    //                 $pcsPerCase = (int)$inventory->pcs_per_unit ?: 1;
+    
+    //                 Log::info("Pieces per case: $pcsPerCase");
+    //                 Log::info("Selected Materials:", $selectedMaterials);
+    
+    //                 foreach ($selectedMaterials as $rawMatName => $supplierOfferId) {
+    //                     $supplierOffer = $supplierOffersMap->get($supplierOfferId);
+    
+    //                     if (!$supplierOffer) {
+    //                         Log::warning("Supplier offer #$supplierOfferId not found");
+    //                         continue;
+    //                     }
+    
+    //                     $pricePerUnit = (float)$supplierOffer->price;
+    //                     $conversion = (float)$supplierOffer->conversion ?: 1; // conversion = pieces per unit
+                        
+    //                     // Price per individual piece of raw material
+    //                     $pricePerPiece = $pricePerUnit / $conversion;
+                        
+    //                     // Cost for one case = price per piece × pieces per case
+    //                     $costPerCase = $pricePerPiece * $pcsPerCase;
+    
+    //                     Log::info("  Raw Material: {$supplierOffer->rawmat_name} (Offer #$supplierOfferId)");
+    //                     Log::info("    Price per unit: ₱$pricePerUnit");
+    //                     Log::info("    Conversion (pcs/unit): $conversion");
+    //                     Log::info("    Price per piece: ₱" . number_format($pricePerPiece, 4));
+    //                     Log::info("    Pieces per case: $pcsPerCase");
+    //                     Log::info("    Cost per case: ₱$pricePerPiece × $pcsPerCase = ₱" . number_format($costPerCase, 2));
+    
+    //                     $productionCostPerCase += $costPerCase;
+    //                 }
+    
+    //                 Log::info("Total Production Cost Per Case: ₱" . number_format($productionCostPerCase, 2));
+    //                 Log::info("COGS for this product: ₱$productionCostPerCase × $casesSold cases = ₱" . number_format($productionCostPerCase * $casesSold, 2));
+    
+    //                 $cogs += $productionCostPerCase * $casesSold;
+    //             }
+    
+    //             Log::info("==================");
+    //             Log::info("ORDER TOTALS:");
+    //             Log::info("Total Sales: ₱" . number_format($order->total_sales, 2));
+    //             Log::info("Total COGS: ₱" . number_format($cogs, 2));
+    //             Log::info("Profit: ₱" . number_format($order->total_sales - $cogs, 2));
+    //             Log::info("==================");
+    
+    //             $order->total_qty = $totalQty;
+    //             $order->cogs = round($cogs, 2);
+    //             $order->profit = round($order->total_sales - $cogs, 2);
+    
+    //             return $order;
+    //         });
+    
+    //     return response()->json($salesOrders);
+    // }
+
+
     public function salesReport(Request $request)
     {
-        // Fetch inventory
+        // Fetch ALL inventory records
         $inventoryMap = DB::table('inventories')
-            ->select('item', 'unit_cost as selling_price', 'selected_materials', 'pcs_per_unit')
             ->get()
             ->keyBy('item');
     
-        // Fetch supplier offers WITH raw material conversion
-        $supplierOffersMap = DB::table('supplier_offers as so')
-            ->join('inventory_rawmats as rm', 'so.rawmat_id', '=', 'rm.id')
-            ->select(
-                'so.id', 
-                'so.price', 
-                'rm.conversion',  // ← Field that contains qty per unit
-                'rm.item as rawmat_name'
-            )
+        // Fetch ALL raw materials
+        $rawMatsMap = DB::table('inventory_rawmats')
             ->get()
             ->keyBy('id');
     
-        Log::info("Supplier Offers with Raw Materials:", $supplierOffersMap->toArray());
+        // Fetch ALL suppliers
+        $suppliersMap = DB::table('suppliers')
+            ->get()
+            ->keyBy('id');
+    
+        // Fetch ALL supplier offers
+        $supplierOffersMap = DB::table('supplier_offers')
+            ->get()
+            ->keyBy('id');
     
         $salesOrders = DB::table('sales_orders as so')
             ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
@@ -49,19 +169,29 @@ class ReportController extends Controller
                 'so.order_type',
                 'so.amount as total_sales',
                 'so.quantities',
+                'c.id as customer_id',
                 'c.name as customer_name'
             )
             ->orderBy('so.date', 'desc')
             ->get()
-            ->map(function ($order) use ($inventoryMap, $supplierOffersMap) {
+            ->map(function ($order) use ($inventoryMap, $rawMatsMap, $suppliersMap, $supplierOffersMap) {
     
+                // Decode products
+                $products = json_decode($order->products, true) ?? [];
+                if (is_string($products)) {
+                    $products = json_decode($products, true) ?? [];
+                }
+    
+                // Decode quantities
                 $quantities = json_decode($order->quantities, true) ?? [];
+                
                 $cogs = 0;
                 $totalQty = 0;
+                $productBreakdown = [];
     
-                Log::info("=== Order {$order->id} ===");
-    
-                foreach ($quantities as $productName => $casesSold) {
+                // Loop through products
+                foreach ($products as $productName) {
+                    $casesSold = $quantities[$productName] ?? 0;
                     $casesSold = (int)$casesSold;
                     $totalQty += $casesSold;
     
@@ -72,16 +202,12 @@ class ReportController extends Controller
                         continue;
                     }
     
-                    Log::info("Product: $productName | Cases Sold: $casesSold");
-                    
                     $selectedMaterials = json_decode($inventory->selected_materials, true) ?? [];
                     $productionCostPerCase = 0;
                     $pcsPerCase = (int)$inventory->pcs_per_unit ?: 1;
+                    $materialsUsed = [];
     
-                    Log::info("Pieces per case: $pcsPerCase");
-                    Log::info("Selected Materials:", $selectedMaterials);
-    
-                    foreach ($selectedMaterials as $rawMatName => $supplierOfferId) {
+                    foreach ($selectedMaterials as $materialName => $supplierOfferId) {
                         $supplierOffer = $supplierOffersMap->get($supplierOfferId);
     
                         if (!$supplierOffer) {
@@ -89,47 +215,225 @@ class ReportController extends Controller
                             continue;
                         }
     
-                        $pricePerUnit = (float)$supplierOffer->price;
-                        $conversion = (float)$supplierOffer->conversion ?: 1; // conversion = pieces per unit
-                        
-                        // Price per individual piece of raw material
-                        $pricePerPiece = $pricePerUnit / $conversion;
-                        
-                        // Cost for one case = price per piece × pieces per case
-                        $costPerCase = $pricePerPiece * $pcsPerCase;
+                        $rawMat = $rawMatsMap->get($supplierOffer->rawmat_id);
     
-                        Log::info("  Raw Material: {$supplierOffer->rawmat_name} (Offer #$supplierOfferId)");
-                        Log::info("    Price per unit: ₱$pricePerUnit");
-                        Log::info("    Conversion (pcs/unit): $conversion");
-                        Log::info("    Price per piece: ₱" . number_format($pricePerPiece, 4));
-                        Log::info("    Pieces per case: $pcsPerCase");
-                        Log::info("    Cost per case: ₱$pricePerPiece × $pcsPerCase = ₱" . number_format($costPerCase, 2));
+                        if (!$rawMat) {
+                            Log::warning("Raw material #{$supplierOffer->rawmat_id} not found");
+                            continue;
+                        }
+    
+                        $supplier = $suppliersMap->get($supplierOffer->supplier_id);
+    
+                        // Get supplier offer price (this is the price we use)
+                        $supplierOfferPrice = (float)$supplierOffer->price;
+                        
+                        // Get conversion factor from raw material
+                        $conversion = (float)$rawMat->conversion ?: 1;
+                        
+                        // Calculate price per piece
+                        $pricePerPiece = $supplierOfferPrice / $conversion;
+                        
+                        // Calculate cost per case (1:1 ratio - 1 piece of raw material per 1 piece of finished good)
+                        $costPerCase = $pricePerPiece * $pcsPerCase;
+                        
+                        // Total pieces of this raw material used for all cases sold
+                        $totalPiecesUsed = $pcsPerCase * $casesSold;
+                        
+                        // Total cost for this raw material
+                        $totalMaterialCost = $pricePerPiece * $totalPiecesUsed;
     
                         $productionCostPerCase += $costPerCase;
+    
+                        // Store material details with calculations
+                        $materialsUsed[] = [
+                            'supplier_offer' => (array) $supplierOffer,
+                            'raw_material' => (array) $rawMat,
+                            'supplier' => $supplier ? (array) $supplier : null,
+                            'calculations' => [
+                                'supplier_offer_price' => $supplierOfferPrice, // Price from supplier_offer (e.g., ₱0.20 per roll)
+                                'conversion' => $conversion, // Pieces per unit (e.g., 10000 pcs per roll)
+                                'price_per_piece' => round($pricePerPiece, 6), // ₱0.20 / 10000 = ₱0.00002 per piece
+                                'pieces_per_case' => $pcsPerCase, // e.g., 24 pcs per case
+                                'cost_per_case' => round($costPerCase, 4), // ₱0.00002 × 24 = ₱0.00048 per case
+                                'cases_sold' => $casesSold,
+                                'total_pieces_used' => $totalPiecesUsed, // 24 × cases_sold
+                                'total_material_cost' => round($totalMaterialCost, 2), // ₱0.00002 × total_pieces_used
+                            ]
+                        ];
                     }
     
-                    Log::info("Total Production Cost Per Case: ₱" . number_format($productionCostPerCase, 2));
-                    Log::info("COGS for this product: ₱$productionCostPerCase × $casesSold cases = ₱" . number_format($productionCostPerCase * $casesSold, 2));
-    
                     $cogs += $productionCostPerCase * $casesSold;
+    
+                    // Store product details
+                    $productBreakdown[] = [
+                        'inventory' => (array) $inventory,
+                        'product_name' => $productName,
+                        'cases_sold' => $casesSold,
+                        'production_cost_per_case' => round($productionCostPerCase, 2),
+                        'total_production_cost' => round($productionCostPerCase * $casesSold, 2),
+                        'materials_used' => $materialsUsed,
+                    ];
                 }
     
-                Log::info("==================");
-                Log::info("ORDER TOTALS:");
-                Log::info("Total Sales: ₱" . number_format($order->total_sales, 2));
-                Log::info("Total COGS: ₱" . number_format($cogs, 2));
-                Log::info("Profit: ₱" . number_format($order->total_sales - $cogs, 2));
-                Log::info("==================");
-    
+                // Add fields to existing order object
                 $order->total_qty = $totalQty;
                 $order->cogs = round($cogs, 2);
                 $order->profit = round($order->total_sales - $cogs, 2);
+                $order->product_breakdown = $productBreakdown;
     
                 return $order;
             });
     
         return response()->json($salesOrders);
     }
+    // public function salesReport(Request $request)
+    // {
+    //     // Fetch ALL inventory records
+    //     $inventoryMap = DB::table('inventories')
+    //         ->get()
+    //         ->keyBy('item');
+    
+    //     // Fetch ALL raw materials
+    //     $rawMatsMap = DB::table('inventory_rawmats')
+    //         ->get()
+    //         ->keyBy('id');
+    
+    //     // Fetch ALL suppliers
+    //     $suppliersMap = DB::table('suppliers')
+    //         ->get()
+    //         ->keyBy('id');
+    
+    //     // Fetch ALL supplier offers
+    //     $supplierOffersMap = DB::table('supplier_offers')
+    //         ->get()
+    //         ->keyBy('id');
+    
+    //     $salesOrders = DB::table('sales_orders as so')
+    //         ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
+    //         ->select('so.*', 'c.*', 'so.id as order_id')
+    //         ->orderBy('so.date', 'desc')
+    //         ->get()
+    //         ->map(function ($order) use ($inventoryMap, $rawMatsMap, $suppliersMap, $supplierOffersMap) {
+    
+    //             // Decode products
+    //             $products = json_decode($order->products, true) ?? [];
+    //             if (is_string($products)) {
+    //                 $products = json_decode($products, true) ?? [];
+    //             }
+    
+    //             // Decode quantities
+    //             $quantities = json_decode($order->quantities, true) ?? [];
+                
+    //             $cogs = 0;
+    //             $totalQty = 0;
+    //             $productBreakdown = [];
+    
+    //             // Loop through products
+    //             foreach ($products as $productName) {
+    //                 $orderQty = $quantities[$productName] ?? 0;
+    //                 $orderQty = (int)$orderQty;
+    //                 $totalQty += $orderQty;
+    
+    //                 // Get inventory for this product
+    //                 $inventory = $inventoryMap->get($productName);
+    
+    //                 if (!$inventory) {
+    //                     Log::warning("No inventory for: $productName");
+    //                     continue;
+    //                 }
+                    
+    //                 // Decode selected_materials
+    //                 $selectedMaterials = json_decode($inventory->selected_materials, true) ?? [];
+    //                 $productionCostPerCase = 0;
+    //                 $pcsPerCase = (int)$inventory->pcs_per_unit ?: 1;
+    //                 $materialsUsed = [];
+    
+    //                 // Loop through selected materials
+    //                 foreach ($selectedMaterials as $materialName => $supplierOfferId) {
+    //                     // Get supplier offer
+    //                     $supplierOffer = $supplierOffersMap->get($supplierOfferId);
+    
+    //                     if (!$supplierOffer) {
+    //                         Log::warning("Supplier offer #$supplierOfferId not found");
+    //                         continue;
+    //                     }
+    
+    //                     // Get raw material
+    //                     $rawMat = $rawMatsMap->get($supplierOffer->rawmat_id);
+    
+    //                     if (!$rawMat) {
+    //                         Log::warning("Raw material #{$supplierOffer->rawmat_id} not found");
+    //                         continue;
+    //                     }
+    
+    //                     // Get supplier
+    //                     $supplier = $suppliersMap->get($supplierOffer->supplier_id);
+    
+    //                     // Calculate costs
+    //                     $pricePerUnit = (float)$supplierOffer->price;
+    //                     $conversion = (float)$rawMat->conversion ?: 1;
+    //                     $pricePerPiece = $pricePerUnit / $conversion;
+    //                     $costPerCase = $pricePerPiece * $pcsPerCase;
+    //                     $totalMaterialCost = $costPerCase * $orderQty;
+    
+    //                     $productionCostPerCase += $costPerCase;
+    
+    //                     // Store complete objects
+    //                     $materialsUsed[] = [
+    //                         'supplier_offer' => (array) $supplierOffer,
+    //                         'raw_material' => (array) $rawMat,
+    //                         'supplier' => $supplier ? (array) $supplier : null,
+    //                         'calculations' => [
+    //                             'price_per_unit' => $pricePerUnit,
+    //                             'conversion' => $conversion,
+    //                             'price_per_piece' => round($pricePerPiece, 4),
+    //                             'pieces_per_case' => $pcsPerCase,
+    //                             'cost_per_case' => round($costPerCase, 2),
+    //                             'cases_sold' => $orderQty,
+    //                             'total_pieces_used' => $pcsPerCase * $orderQty,
+    //                             'total_material_cost' => round($totalMaterialCost, 2),
+    //                         ]
+    //                     ];
+    //                 }
+    
+    //                 $productCOGS = $productionCostPerCase * $orderQty;
+    //                 $cogs += $productCOGS;
+    
+    //                 // Store product with all materials
+    //                 $productBreakdown[] = [
+    //                     'inventory' => (array) $inventory,
+    //                     'product_name' => $productName,
+    //                     'cases_sold' => $orderQty,
+    //                     'pieces_per_case' => $pcsPerCase,
+    //                     'total_pieces_sold' => $pcsPerCase * $orderQty,
+    //                     'production_cost_per_case' => round($productionCostPerCase, 2),
+    //                     'total_cogs' => round($productCOGS, 2),
+    //                     'materials_used' => $materialsUsed,
+    //                 ];
+    //             }
+    
+    //             $profit = $order->amount - $cogs;
+    
+    //             return [
+    //                 'order' => (array) $order,
+    //                 'products' => $productBreakdown,
+    //                 'totals' => [
+    //                     'total_qty' => $totalQty,
+    //                     'total_sales' => round($order->amount, 2),
+    //                     'total_cogs' => round($cogs, 2),
+    //                     'gross_profit' => round($profit, 2),
+    //                     'profit_margin_percent' => $order->amount > 0 
+    //                         ? round(($profit / $order->amount) * 100, 2) 
+    //                         : 0,
+    //                 ]
+    //             ];
+    //         });
+    
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => $salesOrders->values()
+    //     ]);
+    // }
 
     // Stat analytics
     public function topCustomers()
@@ -177,7 +481,214 @@ class ReportController extends Controller
     
         return response()->json($top);
     }
+
+
+    public function getRawMaterialsAnalysis(Request $request)
+    {
+        try {
+            $days = $request->input('days', 30);
+            $forecastDays = $request->input('forecast_days', 30);
+            $leadTime = $request->input('lead_time', 7);
+            
+            $historicalOrders = SalesOrder::where('date', '>=', Carbon::now()->subDays($days))
+                ->where('status', '!=', 'cancelled')
+                ->get();
     
+            \Log::info('Historical Orders Count: ' . $historicalOrders->count());
+            \Log::info('Sample Order: ', $historicalOrders->first() ? $historicalOrders->first()->toArray() : []);
+    
+            $rawMatDemand = $this->calculateRawMaterialDemand($historicalOrders);
+            
+            \Log::info('Raw Material Demand: ', $rawMatDemand);
+            
+            $currentStock = InventoryRawmat::select(
+                'id',
+                'item',
+                'unit',
+                'quantity',
+                'quantity_pieces',
+                'unit_cost',
+                'low_stock_alert',
+                'conversion'
+            )
+            ->orderBy('id')      
+            ->get()
+            ->keyBy('id');
+    
+            \Log::info('Current Stock Count: ' . $currentStock->count());
+    
+            $analysis = [];
+            
+            foreach ($rawMatDemand as $rawMatId => $demand) {
+                $stock = $currentStock->get($rawMatId);
+                
+                if (!$stock) {
+                    \Log::warning("Stock not found for raw material ID: $rawMatId");
+                    continue;
+                }
+                
+                $avgDailyDemand = $demand['total_pieces'] / $days;
+                $forecastDemand = $avgDailyDemand * $forecastDays;
+                $leadTimeDemand = $avgDailyDemand * $leadTime;
+                
+                $currentStockPcs = $stock->quantity_pieces;
+                $stockoutRisk = $currentStockPcs - $forecastDemand;
+                $reorderPoint = $leadTimeDemand + ($stock->low_stock_alert * $stock->conversion);
+                $reorderNeeded = $currentStockPcs <= $reorderPoint;
+                
+                // Get supplier offer price for this raw material
+                $supplierOffer = $demand['supplier_offer'] ?? null;
+                $supplierPrice = $supplierOffer ? $supplierOffer->price : $stock->unit_cost;
+                
+                // Calculate total cost of materials used in historical period
+                $totalUsedCost = $demand['total_pieces'] * ($supplierPrice / $stock->conversion);
+                
+                $analysis[] = [
+                    'raw_material_id' => $rawMatId,
+                    'item' => $stock->item,
+                    'unit' => $stock->unit,
+                    'unit_cost' => $stock->unit_cost,
+                    'supplier_unit_price' => $supplierPrice,
+                    'current_stock_units' => $stock->quantity,
+                    'current_stock_pieces' => $currentStockPcs,
+                    'total_used_pieces' => $demand['total_pieces'],
+                    'total_used_cost' => round($totalUsedCost, 2),
+                    'avg_daily_demand' => round($avgDailyDemand, 2),
+                    'forecast_demand_pieces' => round($forecastDemand, 2),
+                    'forecast_demand_units' => round($forecastDemand / $stock->conversion, 2),
+                    'stockout_risk_pieces' => round($stockoutRisk, 2),
+                    'lead_time_demand_pieces' => round($leadTimeDemand, 2),
+                    'lead_time_demand_units' => round($leadTimeDemand / $stock->conversion, 2),
+                    'reorder_point_pieces' => round($reorderPoint, 2),
+                    'reorder_needed' => $reorderNeeded,
+                    'suggested_order_pieces' => $reorderNeeded ? round(max(0, $forecastDemand - $currentStockPcs + $leadTimeDemand), 2) : 0,
+                    'suggested_order_units' => $reorderNeeded ? round(max(0, ($forecastDemand - $currentStockPcs + $leadTimeDemand) / $stock->conversion), 2) : 0,
+                    'suggested_order_cost' => $reorderNeeded ? round(max(0, ($forecastDemand - $currentStockPcs + $leadTimeDemand) / $stock->conversion) * $supplierPrice, 2) : 0,
+                ];
+            }
+            
+            \Log::info('Analysis Count: ' . count($analysis));
+            
+            $filtered = collect($analysis);
+            
+            if ($request->has('min_price')) {
+                $filtered = $filtered->where('unit_cost', '>=', $request->min_price);
+            }
+            if ($request->has('max_price')) {
+                $filtered = $filtered->where('unit_cost', '<=', $request->max_price);
+            }
+            if ($request->has('unit')) {
+                $filtered = $filtered->where('unit', $request->unit);
+            }
+            if ($request->has('min_quantity')) {
+                $filtered = $filtered->where('current_stock_pieces', '>=', $request->min_quantity);
+            }
+            if ($request->has('max_quantity')) {
+                $filtered = $filtered->where('current_stock_pieces', '<=', $request->max_quantity);
+            }
+            
+            // Calculate totals
+            $totalUsedCost = $filtered->sum('total_used_cost');
+            $totalSuggestedOrderCost = $filtered->sum('suggested_order_cost');
+            
+            return response()->json([
+                'success' => true,
+                'data' => $filtered->values()->all(),
+                'totals' => [
+                    'total_raw_materials_cost_used' => round($totalUsedCost, 2),
+                    'total_suggested_order_cost' => round($totalSuggestedOrderCost, 2),
+                    'materials_needing_reorder' => $filtered->where('reorder_needed', true)->count(),
+                ],
+                'parameters' => [
+                    'historical_days' => $days,
+                    'forecast_days' => $forecastDays,
+                    'lead_time_days' => $leadTime,
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error in getRawMaterialsAnalysis: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+    
+    private function calculateRawMaterialDemand($orders)
+    {
+        $demand = [];
+        
+        foreach ($orders as $order) {
+            \Log::info("Processing Order ID: {$order->id}");
+            
+            $products = is_array($order->products) ? $order->products : json_decode($order->products, true) ?? [];
+            $quantities = is_array($order->quantities) ? $order->quantities : json_decode($order->quantities, true) ?? [];
+            
+            \Log::info('Products: ', $products);
+            \Log::info('Quantities: ', $quantities);
+            
+            foreach ($products as $productName) {
+                $orderQty = $quantities[$productName] ?? 0;
+                
+                \Log::info("Product: $productName, Quantity: $orderQty");
+                
+                if ($orderQty == 0) continue;
+                
+                $inventory = Inventory::where('item', $productName)->first();
+                
+                if (!$inventory) {
+                    \Log::warning("Inventory not found for: $productName");
+                    continue;
+                }
+                
+                if (!$inventory->selected_materials) {
+                    \Log::warning("No selected materials for: $productName");
+                    continue;
+                }
+                
+                $selectedMaterials = is_array($inventory->selected_materials) 
+                    ? $inventory->selected_materials 
+                    : json_decode($inventory->selected_materials, true) ?? [];
+                
+                \Log::info("Selected Materials for $productName: ", $selectedMaterials);
+                
+                foreach ($selectedMaterials as $materialName => $supplierOfferId) {
+                    $supplierOffer = DB::table('supplier_offers')
+                        ->where('id', $supplierOfferId)
+                        ->first();
+                    
+                    if (!$supplierOffer) {
+                        \Log::warning("Supplier offer not found for ID: $supplierOfferId");
+                        continue;
+                    }
+                    
+                    $rawMatId = $supplierOffer->rawmat_id;
+                    
+                    \Log::info("Raw Material ID: $rawMatId, Adding Demand: $orderQty");
+                    
+                    if (!isset($demand[$rawMatId])) {
+                        $demand[$rawMatId] = [
+                            'total_pieces' => 0,
+                            'supplier_offer' => $supplierOffer
+                        ];
+                    }
+                    
+                    $demand[$rawMatId]['total_pieces'] += $orderQty;
+                    // Keep the supplier offer for price calculation
+                    $demand[$rawMatId]['supplier_offer'] = $supplierOffer;
+                }
+            }
+        }
+        
+        \Log::info('Final Demand Calculation: ', $demand);
+        
+        return $demand;
+    }
+
 
 
 

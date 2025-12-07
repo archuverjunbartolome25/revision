@@ -354,7 +354,6 @@ function SalesReport() {
 			const endpoint = "http://localhost:8000/api/reports/stat-analysis";
 
 			const res = await axios.get(endpoint);
-			console.log(res);
 
 			setStatAnalysis(res.data);
 		} catch (err) {
@@ -367,6 +366,7 @@ function SalesReport() {
 	const fetchSalesData = async () => {
 		try {
 			const res = await axios.get("http://localhost:8000/api/reports/sales");
+
 			setSalesData(res.data);
 		} catch (err) {
 			console.error("Error fetching sales report:", err);
@@ -451,8 +451,6 @@ function SalesReport() {
 		fetchEmployees();
 		fetchLogs();
 	}, []);
-
-	console.log(statAnalysis);
 
 	const processMap = {
 		sales_order: "Sales Order",
@@ -1406,91 +1404,250 @@ function SalesReport() {
 			{/* 🔹 Sales Details Modal */}
 			{showModal && selectedSale && (
 				<div className="custom-modal-backdrop">
-					<div className="custom-modal" style={{ width: "500px" }}>
-						<div className="modal-header">
-							<h5>
-								<strong>Sales Details</strong>
-							</h5>
+					<div
+						className="custom-modal"
+						style={{ maxWidth: "1200px", width: "95%" }}
+					>
+						{/* Modal Header */}
+						<div className="modal-header border-bottom pb-3">
+							<div>
+								<h5 className="mb-1">
+									<strong>Order #: {formatOrderNumber(selectedSale)}</strong>
+								</h5>
+								<small className="text-muted">
+									{new Date(selectedSale.date).toLocaleDateString("en-US", {
+										year: "numeric",
+										month: "long",
+										day: "numeric",
+									})}
+								</small>
+							</div>
 							<button
 								type="button"
 								className="btn-close"
 								onClick={closeModal}
 							></button>
 						</div>
-						<hr />
 
-						<p>
-							<strong>Product:</strong>{" "}
-							{selectedSale.products
-								? (() => {
-										try {
-											const parsed = JSON.parse(selectedSale.products); // Parse JSON string
-											return Array.isArray(parsed) ? parsed.join(", ") : parsed; // Join if array
-										} catch {
-											return selectedSale.products; // fallback if not valid JSON
-										}
-								  })()
-								: "N/A"}
-						</p>
+						{/* Order Info */}
+						<div className="p-3 bg-light rounded mt-3">
+							<div className="row">
+								<div className="col-md-6">
+									<p className="mb-2">
+										<strong>Customer:</strong> {selectedSale.customer_name}
+									</p>
+									<p className="mb-2">
+										<strong>Status:</strong>{" "}
+										<span
+											className={`badge ${
+												selectedSale.status === "Delivered"
+													? "bg-success"
+													: selectedSale.status === "Pending"
+													? "bg-warning"
+													: "bg-secondary"
+											}`}
+										>
+											{selectedSale.status}
+										</span>
+									</p>
+								</div>
+								<div className="col-md-6">
+									<p className="mb-2">
+										<strong>Order Type:</strong> {selectedSale.order_type}
+									</p>
+									<p className="mb-2">
+										<strong>Location:</strong> {selectedSale.location}
+									</p>
+								</div>
+							</div>
+						</div>
 
-						<p>
-							<strong>Date:</strong>{" "}
-							{new Date(selectedSale.date).toLocaleString()}
-						</p>
+						{/* Products Section */}
+						<div className="mt-4">
+							<h6 className="mb-3 text-primary">
+								<i className="bi bi-box-seam me-2"></i>
+								Products Ordered
+							</h6>
 
-						<p>
-							<strong>Quantities:</strong>
-						</p>
-						<table
-							className="table table-bordered text-center"
-							style={{ width: "480px" }}
-						>
-							<thead>
-								<tr>
-									<th>Size</th>
-									<th>Cases</th>
-									<th>Quantity (pcs)</th>
-								</tr>
-							</thead>
-							<tbody>
-								{(() => {
-									const quantities = selectedSale.quantities
-										? JSON.parse(selectedSale.quantities)
-										: {};
-									const pcsPerCase = {
-										"350ml": 24,
-										"500ml": 24,
-										"1L": 12,
-										"6L": 1,
-									};
-									return Object.entries(quantities)
-										.filter(([size, qty]) => qty > 0)
-										.map(([size, qty]) => (
-											<tr key={size}>
-												<td>{size}</td>
-												<td>{qty.toLocaleString()}</td>
-												<td>
-													{(qty * (pcsPerCase[size] || 1)).toLocaleString()}
-												</td>
-											</tr>
-										));
-								})()}
-							</tbody>
-						</table>
+							{selectedSale.product_breakdown.map((product, idx) => {
+								console.log(product);
+								const revenue =
+									product.cases_sold * parseFloat(product.inventory.unit_cost);
+								const totalCOGS =
+									product.production_cost_per_case * product.cases_sold;
+								const profit = revenue - totalCOGS;
+								const profitMargin = ((profit / revenue) * 100).toFixed(2);
 
-						<p>
-							<strong>Total Sales:</strong>{" "}
-							{formatToPeso(selectedSale.total_sales)}
-						</p>
-						<p>
-							<strong>COGS:</strong> {formatToPeso(selectedSale.cogs)}
-						</p>
-						<p>
-							<strong>Profit:</strong>
-							{formatToPeso(
-								Number(selectedSale.total_sales) - Number(selectedSale.cogs)
-							)}
-						</p>
+								return (
+									<div key={idx} className="card mb-3">
+										{/* Product Header */}
+										<div className="card-header bg-white">
+											<div className="row align-items-center">
+												<div className="col-md-4">
+													<h6 className="mb-0">{product.product_name}</h6>
+													<small className="text-muted">
+														{product.inventory.pcs_per_unit} pcs per case
+													</small>
+												</div>
+												<div className="col-md-2 text-center">
+													<small className="text-muted d-block">Cases</small>
+													<strong>{formatNumber(product.cases_sold)}</strong>
+												</div>
+												<div className="col-md-2 text-center">
+													<small className="text-muted d-block">
+														Unit Price
+													</small>
+													<strong>
+														{formatToPeso(product.inventory.unit_cost)}
+													</strong>
+												</div>
+												<div className="col-md-2 text-center">
+													<small className="text-muted d-block">Revenue</small>
+													<strong className="text-success">
+														{formatToPeso(revenue)}
+													</strong>
+												</div>
+												<div className="col-md-2 text-center">
+													<small className="text-muted d-block">COGS</small>
+													<strong className="text-danger">
+														{formatToPeso(totalCOGS)}
+													</strong>
+												</div>
+											</div>
+										</div>
+
+										{/* Materials Table */}
+										<div className="card-body">
+											<p className="mb-2 fw-semibold">Raw Materials:</p>
+											<div className="table-responsive">
+												<table className="table table-sm table-bordered mb-0">
+													<thead className="table-light">
+														<tr>
+															<th>Material</th>
+															<th>Supplier</th>
+															<th className="text-end">Price/Unit</th>
+															<th className="text-center">Qty per Case</th>
+															<th className="text-end">Total</th>
+														</tr>
+													</thead>
+													<tbody>
+														{product.materials_used.map((material, midx) => {
+															const price = Number(
+																material.supplier_offer.price
+															);
+
+															const pricePerPiece = price;
+															const pcsPerCase = product.inventory.pcs_per_unit;
+															const costPerCase = pricePerPiece * pcsPerCase;
+															const totalCost =
+																costPerCase * product.cases_sold;
+
+															console.log(material);
+
+															return (
+																<tr key={midx}>
+																	<td>
+																		<strong>
+																			{material.raw_material.item}
+																		</strong>
+																		<br />
+																		<small className="text-muted">
+																			{formatToPeso(price)}
+																		</small>
+																	</td>
+																	<td>
+																		{material.supplier.name}
+																		<br />
+																		<small className="text-muted">
+																			{material.supplier_offer.unit}
+																		</small>
+																	</td>
+																	<td className="text-end">
+																		{formatToPeso(pricePerPiece)}
+																	</td>
+
+																	<td className="text-center">
+																		{pcsPerCase} pcs
+																	</td>
+
+																	<td className="text-end fw-bold">
+																		{formatToPeso(totalCost)}
+																	</td>
+																</tr>
+															);
+														})}
+													</tbody>
+												</table>
+											</div>
+
+											{/* Product Profit Summary */}
+											<div className="row mt-3 p-2 bg-light rounded">
+												<div className="col-3 text-center">
+													<small className="text-muted d-block">Revenue</small>
+													<strong className="text-success">
+														{formatToPeso(revenue)}
+													</strong>
+												</div>
+												<div className="col-3 text-center">
+													<small className="text-muted d-block">COGS</small>
+													<strong className="text-danger">
+														{formatToPeso(totalCOGS)}
+													</strong>
+												</div>
+												<div className="col-3 text-center">
+													<small className="text-muted d-block">Profit</small>
+													<strong className="text-primary">
+														{formatToPeso(profit)}
+													</strong>
+												</div>
+												<div className="col-3 text-center">
+													<small className="text-muted d-block">Margin</small>
+													<strong>{profitMargin}%</strong>
+												</div>
+											</div>
+										</div>
+									</div>
+								);
+							})}
+						</div>
+
+						{/* Order Total Summary */}
+						<div className="card bg-primary text-white mt-4">
+							<div className="card-body">
+								<h6 className="mb-3">Order Summary</h6>
+								<div className="row text-center">
+									<div className="col-3">
+										<small className="d-block opacity-75">Total Cases</small>
+										<h4 className="mb-0">
+											{formatNumber(selectedSale.total_qty)}
+										</h4>
+									</div>
+									<div className="col-3">
+										<small className="d-block opacity-75">Total Revenue</small>
+										<h4 className="mb-0">
+											{formatToPeso(selectedSale.total_sales)}
+										</h4>
+									</div>
+									<div className="col-3">
+										<small className="d-block opacity-75">Total COGS</small>
+										<h4 className="mb-0">{formatToPeso(selectedSale.cogs)}</h4>
+									</div>
+									<div className="col-3">
+										<small className="d-block opacity-75">Gross Profit</small>
+										<h4 className="mb-0">
+											{formatToPeso(selectedSale.profit)}
+										</h4>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						{/* Footer */}
+						<div className="modal-footer mt-3 border-top pt-3">
+							<button className="btn btn-secondary" onClick={closeModal}>
+								Close
+							</button>
+						</div>
 					</div>
 				</div>
 			)}

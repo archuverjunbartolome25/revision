@@ -245,6 +245,7 @@ function SalesOrder() {
 			console.error("Error fetching dashboard data:", error);
 		}
 	};
+
 	useEffect(() => {
 		fetchData();
 	}, []);
@@ -262,27 +263,29 @@ function SalesOrder() {
 			const res = await axios.get(url, { params: { interface_type: type } });
 
 			// Parse quantities JSON string for each order
-			const parsedOrders = res.data.map((order) => ({
-				...order,
-				quantities:
-					typeof order.quantities === "string"
-						? JSON.parse(order.quantities)
-						: order.quantities || {},
-			}));
+			const parsedOrders = res.data.map((order) => {
+				const totalQuantity = Object.values(order.quantities);
 
-			// Custom sorting: Pending first (newest → oldest), then Delivered (newest → oldest)
-			const sortedOrders = parsedOrders.sort((a, b) => {
-				// 1. Priority by status
-				const statusOrder = {
-					Pending: 1,
-					Delivered: 2,
+				const sum = totalQuantity.reduce((acc, curr) => acc + curr, 0);
+
+				return {
+					...order,
+					total_quantity_ordered: sum,
+					quantities:
+						typeof order.quantities === "string"
+							? JSON.parse(order.quantities)
+							: order.quantities || {},
 				};
+			});
 
-				if (statusOrder[a.status] !== statusOrder[b.status]) {
-					return statusOrder[a.status] - statusOrder[b.status];
+			const sortedOrders = parsedOrders.sort((a, b) => {
+				if (a.status === "Pending" && b.status !== "Pending") return -1;
+				if (a.status !== "Pending" && b.status === "Pending") return 1;
+
+				if (a.status === "Pending" && b.status === "Pending") {
+					return b.total_quantity_ordered - a.total_quantity_ordered;
 				}
 
-				// 2. If same status → sort by newest date first
 				return new Date(b.date) - new Date(a.date);
 			});
 
@@ -816,11 +819,14 @@ function SalesOrder() {
 								<th>Date Delivered</th>
 								<th>Amount</th>
 								<th>Status</th>
+								<th>Product Name</th>
+								<th>Qty (unit)</th>
+								<th>Total no. of Orders</th>
 							</tr>
 						</thead>
+
 						<tbody>
 							{loading ? (
-								// 🦴 Skeleton loading placeholder (5 rows)
 								[...Array(5)].map((_, i) => (
 									<tr key={i} className="animate-pulse">
 										<td>
@@ -847,63 +853,147 @@ function SalesOrder() {
 										<td>
 											<Skeleton width={80} height={20} />
 										</td>
+										<td>
+											<Skeleton width={80} height={20} />
+										</td>
+										<td>
+											<Skeleton width={80} height={20} />
+										</td>
+										<td>
+											<Skeleton width={80} height={20} />
+										</td>
 									</tr>
 								))
 							) : currentOrders.length > 0 ? (
-								// ✅ Real data when loaded
 								currentOrders.map((order, index) => {
-									const customer = customers.find(
-										(c) => c.id === order?.customer_id
-									);
-									const customerName =
-										order.customer?.name ||
-										customers.find((c) => c.id === order?.customer_id)?.name ||
-										"Unknown";
 									const globalIndex = indexOfFirstItem + index;
+									const customer =
+										order.customer ||
+										customers.find((c) => c.id === order.customer_id);
+									const customerName = customer?.name || "Unknown";
+
+									const quantityEntries = order.quantities
+										? Object.entries(order.quantities)
+										: [];
+									const totalQuantity = quantityEntries.reduce(
+										(acc, [, qty]) => acc + qty,
+										0
+									);
 
 									return (
-										<tr
-											key={order?.id || `order-${globalIndex}`}
-											onClick={() => openModal(globalIndex)}
-											style={{ cursor: "pointer" }}
-										>
-											<td onClick={(e) => e.stopPropagation()}>
-												<input
-													type="checkbox"
-													checked={selectedRows.includes(globalIndex)}
-													onChange={() => handleRowCheckbox(globalIndex)}
-												/>
-											</td>
-											<td>{formatOrderNumber(order)}</td>
-											<td>{customerName}</td>
-											<td>{formatDate(order?.date || "N/A")}</td>
-											<td>{formatDate(order?.delivery_date || "N/A")}</td>
-											<td>{formatDate(order?.date_delivered || "N/A")}</td>
-											<td>
-												{order?.amount != null
-													? `${formatToPeso(order.amount)}`
-													: "N/A"}
-											</td>
-											<td>
-												<span
-													className={`badge ${
-														order.status === "Delivered"
-															? "bg-success"
-															: order.status === "Processing"
-															? "bg-warning text-dark"
-															: "bg-warning text-dark"
-													}`}
-												>
-													{order.status || "Pending"}
-												</span>
-											</td>
-										</tr>
+										<React.Fragment key={order.id || `order-${globalIndex}`}>
+											{quantityEntries.length > 0 ? (
+												quantityEntries.map(([productName, quantity], idx) => {
+													return (
+														<tr
+															key={`${
+																order.id || `order-${globalIndex}`
+															}-${productName}`}
+															onClick={() => openModal(globalIndex)}
+															style={{ cursor: "pointer" }}
+														>
+															<td>
+																<input
+																	type="checkbox"
+																	checked={selectedRows.includes(globalIndex)}
+																	onChange={(e) => {
+																		e.stopPropagation();
+																		handleRowCheckbox(globalIndex);
+																	}}
+																/>
+															</td>
+															<td>{formatOrderNumber(order)}</td>
+															<td>{customerName}</td>
+															<td>{formatDate(order.date || "N/A")}</td>
+															<td>
+																{formatDate(order.delivery_date || "N/A")}
+															</td>
+															<td>
+																{formatDate(order.date_delivered || "N/A")}
+															</td>
+															<td>
+																{order.amount != null
+																	? formatToPeso(order.amount)
+																	: "N/A"}
+															</td>
+
+															<td>
+																<span
+																	className={`badge ${
+																		order.status === "Delivered"
+																			? "bg-success"
+																			: "bg-warning text-dark"
+																	}`}
+																>
+																	{order.status || "Pending"}
+																</span>
+															</td>
+
+															<td class="">
+																{quantityEntries.map(([productName], idx) => (
+																	<div key={idx}>{productName}</div>
+																))}
+															</td>
+
+															<td class="">
+																{quantityEntries.map(([key, quantity], idx) => {
+																	return (
+																		<div
+																			key={idx}
+																			className="text-center my-auto mt-2 mb-2"
+																		>
+																			{formatNumber(quantity)}
+																		</div>
+																	);
+																})}
+															</td>
+
+															<td className="">
+																{formatNumber(totalQuantity)}
+															</td>
+														</tr>
+													);
+												})
+											) : (
+												<tr key={order.id || `order-${globalIndex}`}>
+													<td>
+														<input
+															type="checkbox"
+															checked={selectedRows.includes(globalIndex)}
+															onChange={() => handleRowCheckbox(globalIndex)}
+														/>
+													</td>
+													<td>{formatOrderNumber(order)}</td>
+													<td>{customerName}</td>
+													<td>{formatDate(order.date || "N/A")}</td>
+													<td>{formatDate(order.delivery_date || "N/A")}</td>
+													<td>{formatDate(order.date_delivered || "N/A")}</td>
+													<td>
+														{order.amount != null
+															? formatToPeso(order.amount)
+															: "N/A"}
+													</td>
+													<td>
+														<span
+															className={`badge ${
+																order.status === "Delivered"
+																	? "bg-success"
+																	: "bg-warning text-dark"
+															}`}
+														>
+															{order.status || "Pending"}
+														</span>
+													</td>
+													{/* No items */}
+													<td colSpan={3}>No items</td>
+												</tr>
+											)}
+										</React.Fragment>
 									);
 								})
 							) : (
-								// ⚠️ No data available
 								<tr>
-									<td colSpan="8" className="text-center text-gray-500 py-3">
+									<td colSpan="11" className="text-center text-gray-500 py-3">
 										No sales orders found.
 									</td>
 								</tr>
