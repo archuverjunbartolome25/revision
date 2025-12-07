@@ -627,29 +627,28 @@ public function markDelivered(Request $request, $id)
         // Safe quantities
         $quantities = $order->quantities ?? [];
     
-        Log::info('Products (decoded):', ['products' => $products]);
-        Log::info('Quantities:', ['quantities' => $quantities]);
-        Log::info('Order object:', ['order' => $order]);
-    
-        // Fetch unit prices from Inventory
-        $inventories = Inventory::whereIn('item', $products)->pluck('unit_cost', 'item')->toArray();
+        // Fetch unit prices and units from Inventory
+        $inventories = Inventory::whereIn('item', $products)
+            ->get()
+            ->keyBy('item'); // Key by product name for easy lookup
     
         // Build items array
         $items = [];
         foreach ($products as $product) {
             $qty = $quantities[$product] ?? 0;
-            $unitPrice = $inventories[$product] ?? 0;
+    
+            $unitPrice = $inventories[$product]->unit_cost ?? 0;
+            $unit = $inventories[$product]->unit ?? 'Unknown';
             $total = $qty * $unitPrice;
     
             $items[] = [
                 'product' => $product,
                 'quantity' => $qty,
+                'unit' => $unit,
                 'unit_price' => $unitPrice,
                 'total_price' => $total,
             ];
         }
-    
-        Log::info('Prepared items:', ['items' => $items]);
     
         // Generate order number
         $datePart = Carbon::parse($order->date)->format('Y-m-d');
@@ -666,6 +665,7 @@ public function markDelivered(Request $request, $id)
     
         return $pdf->download('sales-order-' . $order->id . '.pdf');
     }
+    
 
 public function mostSelling()
 {

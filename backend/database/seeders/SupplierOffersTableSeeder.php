@@ -95,7 +95,7 @@ class SupplierOffersTableSeeder extends Seeder
                 'supplier_id' => 3,
                 'rawmat_id' => 7, // Label
                 'unit' => 'rolls',
-                'price' => 0.20,
+                'price' => 0.40,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],
@@ -106,7 +106,7 @@ class SupplierOffersTableSeeder extends Seeder
                 'supplier_id' => 4,
                 'rawmat_id' => 7, // Label - different rawmat_id
                 'unit' => 'rolls',
-                'price' => 0.60,
+                'price' => 0.30,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
             ],

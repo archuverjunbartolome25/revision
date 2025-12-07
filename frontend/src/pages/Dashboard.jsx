@@ -148,119 +148,99 @@ function Dashboard() {
 	const [salesOrdersCount, setSalesOrdersCount] = useState(0);
 
 	// Forecast
-	const [forecastData, setForecastData] = useState({ labels: [], data: [] });
 	const [forecastPeriod, setForecastPeriod] = useState("daily"); // daily, weekly, monthly, yearly
 
 	// Fetch dashboard data
-const fetchDashboardData = async () => {
-    try {
-        const employeeID = localStorage.getItem("employeeID");
+	const fetchDashboardData = async () => {
+		try {
+			const employeeID = localStorage.getItem("employeeID");
 
-        // User info
-        if (employeeID) {
-            const userRes = await axios.get(
-                `http://localhost:8000/api/users/${employeeID}`
-            );
-            const user = userRes.data || {};
-            setUserFirstName(user.firstname || "");
-            setUserFullName(
-                `${user.firstname || ""} ${user.lastname || ""}`.trim()
-            );
-            setEmployeeID(user.employeeID || "");
-            setRole(user.role || "");
-        }
+			// User info
+			if (employeeID) {
+				const userRes = await axios.get(
+					`http://localhost:8000/api/users/${employeeID}`
+				);
+				const user = userRes.data || {};
+				setUserFirstName(user.firstname || "");
+				setUserFullName(
+					`${user.firstname || ""} ${user.lastname || ""}`.trim()
+				);
+				setEmployeeID(user.employeeID || "");
+				setRole(user.role || "");
+			}
 
-        // Return to Vendor - Pending only
-        const rtvRes = await axios.get(
-            "http://localhost:8000/api/return-to-vendor"
-        );
-        const pendingRtv = (rtvRes.data.returnToVendor || []).filter(
-            (item) => item.status === "Pending"
-        );
-        setRtvCount(pendingRtv.length);
+			// Return to Vendor - Pending only
+			const rtvRes = await axios.get(
+				"http://localhost:8000/api/return-to-vendor"
+			);
+			const pendingRtv = (rtvRes.data.returnToVendor || []).filter(
+				(item) => item.status === "Pending"
+			);
+			setRtvCount(pendingRtv.length);
 
-        // Disposal - Pending only
-        const dispRes = await axios.get(
-            "http://localhost:8000/api/disposals"
-        );
-        const pendingDisposals = (dispRes.data.data || []).filter(
-            (item) => item.status === "Pending"
-        ).length;
-        setDisposalCount(pendingDisposals);
+			// Disposal - Pending only
+			const dispRes = await axios.get("http://localhost:8000/api/disposals");
+			const pendingDisposals = (dispRes.data.data || []).filter(
+				(item) => item.status === "Pending"
+			).length;
+			setDisposalCount(pendingDisposals);
 
-        // Purchase Orders
-        const [pendingRes, partialRes, completedRes] = await Promise.all([
-            axios.get("http://localhost:8000/api/purchase-orders/pending-count"),
-            axios.get("http://localhost:8000/api/purchase-orders/partial-count"),
-            axios.get("http://localhost:8000/api/purchase-orders/completed-count"),
-        ]);
+			// Purchase Orders
+			const [pendingRes, partialRes, completedRes] = await Promise.all([
+				axios.get("http://localhost:8000/api/purchase-orders/pending-count"),
+				axios.get("http://localhost:8000/api/purchase-orders/partial-count"),
+				axios.get("http://localhost:8000/api/purchase-orders/completed-count"),
+			]);
 
-        const pending = pendingRes.data.count || 0;
-        const partial = partialRes.data.count || 0;
-        const completed = completedRes.data.count || 0;
+			const pending = pendingRes.data.count || 0;
+			const partial = partialRes.data.count || 0;
+			const completed = completedRes.data.count || 0;
 
-        setPurchaseOrdersCount(pending + partial);
-        setPendingOrders(pending);
-        setPartiallyReceivedOrders(partial);
-        setCompletedOrders(completed);
+			setPurchaseOrdersCount(pending + partial);
+			setPendingOrders(pending);
+			setPartiallyReceivedOrders(partial);
+			setCompletedOrders(completed);
 
-        // Inventory + Raw Mats
-        const [inventoryRes, rawMatsRes] = await Promise.all([
-            axios.get("http://localhost:8000/api/inventories"),
-            axios.get("http://localhost:8000/api/inventory_rawmats"),
-        ]);
+			const [inventoryRes, rawMatsRes] = await Promise.all([
+				axios.get("http://localhost:8000/api/inventories"),
+				axios.get("http://localhost:8000/api/inventory_rawmats"),
+			]);
 
-        setInventory(inventoryRes.data || []);
-        setRawMats(rawMatsRes.data || []);
+			setInventory(inventoryRes.data || []);
+			setRawMats(rawMatsRes.data || []);
 
-        // Top-selling product
-        const topSellingRes = await axios.get(
-            "http://localhost:8000/api/sales-orders/most-selling"
-        );
+			const topSellingRes = await axios.get(
+				"http://localhost:8000/api/sales-orders/most-selling"
+			);
 
-        if (topSellingRes.data && topSellingRes.data.top_product) {
-            setTopSellingProduct({
-                name: topSellingRes.data.top_product,
-                total: topSellingRes.data.total_sold,
-            });
-        }
+			if (topSellingRes.data && topSellingRes.data.top_product) {
+				setTopSellingProduct({
+					name: topSellingRes.data.top_product,
+					total: topSellingRes.data.total_sold,
+				});
+			}
 
-        // ⭐ FIXED: Fetch Top Products
-        const topProductsRes = await axios.get(
-            "http://localhost:8000/api/sales-orders/top-products"
-        );
+			// ⭐ FIXED: Fetch Top Products
+			const topProductsRes = await axios.get(
+				"http://localhost:8000/api/sales-orders/top-products"
+			);
 
-        setTopProducts(topProductsRes.data || []);
+			setTopProducts(topProductsRes.data || []);
 
-        // Total sales orders count
-        const salesRes = await axios.get(
-            "http://localhost:8000/api/sales-orders/count"
-        );
-        setSalesOrdersCount(salesRes.data.count || 0);
-
-        // Forecast data
-        const forecastRes = await axios.get(
-            `http://localhost:8000/api/forecast?period=${forecastPeriod}`
-        );
-
-        setForecastData({
-            labels: forecastRes.data.labels || [],
-            data: forecastRes.data.values || [],
-        });
-
-    } catch (error) {
-        console.error("⚠️ Error fetching dashboard data:", error);
-    }
-};
-
+			const salesRes = await axios.get(
+				"http://localhost:8000/api/sales-orders/count"
+			);
+			setSalesOrdersCount(salesRes.data.count || 0);
+		} catch (error) {
+			console.error("⚠️ Error fetching dashboard data:", error);
+		}
+	};
 
 	const fetchNotification = async () => {
 		try {
 			const endpoint = "http://localhost:8000/api/notifications";
 
 			const res = await axios.get(endpoint);
-
-			console.log(res.data);
 
 			setStockNotifications(res.data);
 		} catch (err) {
@@ -284,20 +264,6 @@ const fetchDashboardData = async () => {
 		);
 	}, []);
 
-	// Chart.js line data
-	const forecastChartData = {
-		labels: forecastData.labels,
-		datasets: [
-			{
-				label: `Forecast (${forecastPeriod})`,
-				data: forecastData.data,
-				fill: false,
-				backgroundColor: "rgba(75,192,192,0.4)",
-				borderColor: "rgba(75,192,192,1)",
-				tension: 0.3,
-			},
-		],
-	};
 	// Inventory activity logs helpers
 	const processMap = {
 		sales_order: "Sales Order",
@@ -779,7 +745,7 @@ const fetchDashboardData = async () => {
 					{/* Most Selling Products */}
 					<div className="section-box most-selling text-center">
 						<div className="section-title">
-							Best Performing SKU
+							SKU
 							<br />
 							(This Month)
 						</div>

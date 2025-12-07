@@ -67,8 +67,8 @@ class InventorySeeder extends Seeder
                 'low_stock_alert' => 200,
                 'created_at' => $now,
                 'updated_at' => $now,
-                'materials_needed' => '["Plastic Gallon (6L)","Blue Plastic Cap (6L)","Label","Shrinkfilm"]',
-                'selected_materials' => '{"Plastic Gallon (6L)":5,"Blue Plastic Cap (6L)":8,"Label":9,"Shrinkfilm":12}'
+                'materials_needed' => '["Plastic Gallon (6L)","Blue Plastic Cap (6L)","Label"]',
+                'selected_materials' => '{"Plastic Gallon (6L)":5,"Blue Plastic Cap (6L)":8,"Label":9}'
             ],
         ]);
     }
