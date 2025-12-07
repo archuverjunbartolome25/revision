@@ -30,15 +30,16 @@ ChartJS.register(
 const safeAlias = (str) => {
 	return str
 		.toLowerCase()
-		.replace(/\s+/g, "_") // Replace spaces with underscore
-		.replace(/[()]/g, "_") // Replace parentheses with underscore
-		.replace(/[^a-z0-9_]/g, ""); // Remove anything that's not alphanumeric or underscore
+		.replace(/\s+/g, "_")
+		.replace(/[()]/g, "_")
+		.replace(/[^a-z0-9_]/g, "");
 };
 
 const DemandForecastChart = () => {
-	const [selectedDate, setSelectedDate] = useState(new Date());
-	const [forecast, setForecast] = useState({});
-	const [historical, setHistorical] = useState({});
+	const [historical, setHistorical] = useState([]);
+	const [forecast, setForecast] = useState([]);
+	const [chartData, setChartData] = useState(null);
+
 	const [availableProducts, setAvailableProducts] = useState([]);
 	const [selectedProduct, setSelectedProduct] = useState("");
 	const [chartType, setChartType] = useState("line");
@@ -70,14 +71,13 @@ const DemandForecastChart = () => {
 		"December",
 	];
 
-	// Fetch available products on mount
+	// Fetch available products
 	useEffect(() => {
 		axios
 			.get("http://localhost:8000/api/forecast/products")
 			.then((res) => {
 				const products = res.data.products || [];
 				setAvailableProducts(products);
-				// Set first product as default if available
 				if (products.length > 0 && !selectedProduct) {
 					setSelectedProduct(products[0].item);
 				}
@@ -85,81 +85,45 @@ const DemandForecastChart = () => {
 			.catch((err) => console.error("Failed to fetch products:", err));
 	}, []);
 
-	// Fetch historical sales data
-	// Update the useEffect for historical sales data
-	useEffect(() => {
-		if (!selectedProduct) return;
-
-		setLoading(true);
-		axios
-			.get("http://localhost:8000/api/forecast/historical-sales", {
-				params: { product: selectedProduct },
-			})
-			.then((res) => {
-				const salesData = res.data.sales || [];
-				const products = res.data.products || [];
-
-				const transformed = {};
-
-				products.forEach((product) => {
-					const productAlias = safeAlias(product);
-					transformed[product] = salesData.map((item) => {
-						const qtyKey = `qty_${productAlias}`;
-						const qtyValue = item[qtyKey];
-
-						return {
-							date: item.date,
-							qty: qtyValue !== null && qtyValue !== undefined ? qtyValue : 0,
-						};
-					});
-				});
-
-				console.log("Transformed Historical Data:", transformed);
-				setHistorical(transformed);
-			})
-			.catch((err) => console.error("Historical sales error:", err))
-			.finally(() => setLoading(false));
-	}, [selectedProduct]);
-
-	// Fetch forecast data
+	// Fetch forecast/historical data
 	useEffect(() => {
 		if (!selectedProduct) return;
 
 		axios
 			.get("http://localhost:8000/api/forecast/predict", {
-				params: {
-					product: selectedProduct,
-					days: 365, // Get full year forecast
-					avg_period: 7,
-				},
+				params: { product: selectedProduct, days: 365, avg_period: 7 },
 			})
 			.then((res) => {
-				const forecasts = res.data.forecasts || {};
+				const forecasts = Object.values(res.data.forecast);
+				const historicalData = forecasts[0]?.historical || [];
 
-				// Transform forecast data
-				const transformed = {};
-				Object.keys(forecasts).forEach((productKey) => {
-					transformed[productKey] = forecasts[productKey].forecast.map((f) => ({
-						date: f.date,
-						predicted_qty: f.predicted_qty,
-					}));
-				});
+				// Set historical (actual + predicted)
+				setHistorical(historicalData);
 
-				setForecast(transformed);
+				// Set forecast (predicted_qty only)
+				setForecast(
+					historicalData.map((h) => ({
+						date: h.date,
+						predicted_qty: h.predicted_qty,
+					}))
+				);
+
+				setLoading(false);
 			})
 			.catch((err) => console.error("Forecast error:", err));
 	}, [selectedProduct]);
 
+	// Helpers
 	const getHistoricalTotal = (product, filterFn) => {
-		if (!historical[product]) return 0;
-		return historical[product]
+		if (!historical) return 0;
+		return historical
 			.filter(filterFn)
-			.reduce((sum, f) => sum + (f.qty || 0), 0);
+			.reduce((sum, f) => sum + (f.actual_qty || 0), 0);
 	};
 
 	const getForecastTotal = (product, filterFn) => {
-		if (!forecast[product]) return 0;
-		return forecast[product]
+		if (!forecast) return 0;
+		return forecast
 			.filter(filterFn)
 			.reduce((sum, f) => sum + (f.predicted_qty || 0), 0);
 	};
@@ -172,21 +136,23 @@ const DemandForecastChart = () => {
 		const labels = ["Prev", "Current", "Next"].map(
 			(_, i) => months[(month + i - 2 + 12) % 12]
 		);
+
 		const historicalData = labels.map((_, i) =>
 			getHistoricalTotal(selectedProduct, (f) => {
 				const d = new Date(f.date);
 				return (
-					d.getMonth() + 1 === ((month + i - 2 + 12) % 12) + 1 &&
-					d.getFullYear() === year
+					d.getFullYear() === year &&
+					d.getMonth() + 1 === ((month + i - 2 + 12) % 12) + 1
 				);
 			})
 		);
+
 		const forecastData = labels.map((_, i) =>
 			getForecastTotal(selectedProduct, (f) => {
 				const d = new Date(f.date);
 				return (
-					d.getMonth() + 1 === ((month + i - 2 + 12) % 12) + 1 &&
-					d.getFullYear() === year
+					d.getFullYear() === year &&
+					d.getMonth() + 1 === ((month + i - 2 + 12) % 12) + 1
 				);
 			})
 		);
@@ -260,9 +226,7 @@ const DemandForecastChart = () => {
 						: `(Year View) Demand vs Forecast - ${selectedProduct}`,
 				font: { size: 18 },
 			},
-			datalabels: {
-				display: false,
-			},
+			datalabels: { display: false },
 		},
 		scales: { y: { beginAtZero: true } },
 	};
@@ -280,9 +244,7 @@ const DemandForecastChart = () => {
 			  })
 			: computeYearData(selectedYear2, { hist: "orange", fore: "purple" });
 
-	if (loading) {
-		return <div className="text-center p-5">Loading data...</div>;
-	}
+	if (loading) return <div className="text-center p-5">Loading data...</div>;
 
 	return (
 		<div>
@@ -325,7 +287,9 @@ const DemandForecastChart = () => {
 					</select>
 				</div>
 			</div>
+
 			<hr />
+
 			<div
 				style={{
 					display: "flex",
