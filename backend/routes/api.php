@@ -166,10 +166,26 @@ Route::prefix('users')->group(function () {
 // ============================
 // Route::get('historical-sales', [ForecastController::class, 'historicalSales']);
 // Route::get('forecast', [ForecastController::class, 'forecast']);
+// Route::prefix('forecast')->group(function () {
+//     Route::get('/products', [ForecastController::class, 'getAvailableProducts']);
+//     Route::get('/historical-sales', [ForecastController::class, 'historicalSales']);
+//     Route::get('/predict', [ForecastController::class, 'forecast']);
+//     Route::get('/aggregate', [ForecastController::class, 'aggregateForecast']);
+// });
+
+
+
 Route::prefix('forecast')->group(function () {
+    // Get available products
     Route::get('/products', [ForecastController::class, 'getAvailableProducts']);
+    
+    // Get raw historical data
     Route::get('/historical-sales', [ForecastController::class, 'historicalSales']);
+    
+    // Generate forecast
     Route::get('/predict', [ForecastController::class, 'forecast']);
+    
+    // Aggregate forecast (all products)
     Route::get('/aggregate', [ForecastController::class, 'aggregateForecast']);
 });
 
