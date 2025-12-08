@@ -294,12 +294,9 @@ function Inventory() {
 		fetchNotification();
 	}, []);
 
-	console.log("inventoryData", inventoryData);
-
-	// Assign stock_notification based on backend checkItemStock logic
 	const inventoryWithStatus = inventoryData.map((i) => {
 		const quantityInPieces =
-			inventoryType === "raw" ? i.quantity_pieces : i.quantity_pcs;
+			inventoryType === "raw" ? i.quantity_pieces : i.quantity;
 
 		const lowStockAlert = i.low_stock_alert ?? 0;
 		let stock_notification = "fine"; // default
@@ -481,6 +478,7 @@ function Inventory() {
 		}
 	};
 
+	console.log(currentItems);
 	return (
 		<div
 			className={`dashboard-container ${
@@ -963,6 +961,10 @@ function Inventory() {
 
 													<td>{formatNumber(item.conversion)} pcs/unit</td>
 
+													<td>
+														{formatNumber(item.quantity)} {item.unit}
+													</td>
+
 													<td
 														className={
 															item.stock_notification === "critical"
@@ -972,10 +974,6 @@ function Inventory() {
 																: "text-success"
 														}
 													>
-														{formatNumber(item.quantity)} {item.unit}
-													</td>
-
-													<td style={{ fontWeight: "bold" }}>
 														{formatNumber(item.quantity_pieces)} pcs
 													</td>
 

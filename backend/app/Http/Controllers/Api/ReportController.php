@@ -12,126 +12,12 @@ use App\Models\SalesOrder;
 use App\Models\InventoryRawMat;
 use App\Models\Inventory;
 
+
+
 class ReportController extends Controller
 {
 
-    // *NEW
-    // public function salesReport(Request $request)
-    // {
-    //     // Fetch inventory
-    //     $inventoryMap = DB::table('inventories')
-    //         ->select('item', 'unit_cost as selling_price', 'selected_materials', 'pcs_per_unit')
-    //         ->get()
-    //         ->keyBy('item');
-    
-    //     // Fetch supplier offers WITH raw material conversion
-    //     $supplierOffersMap = DB::table('supplier_offers as so')
-    //         ->join('inventory_rawmats as rm', 'so.rawmat_id', '=', 'rm.id')
-    //         ->select(
-    //             'so.id', 
-    //             'so.price', 
-    //             'rm.conversion',  // ← Field that contains qty per unit
-    //             'rm.item as rawmat_name'
-    //         )
-    //         ->get()
-    //         ->keyBy('id');
-    
-    //     Log::info("Supplier Offers with Raw Materials:", $supplierOffersMap->toArray());
-    
-    //     $salesOrders = DB::table('sales_orders as so')
-    //         ->leftJoin('customers as c', 'so.customer_id', '=', 'c.id')
-    //         ->select(
-    //             'so.id',
-    //             'so.location',
-    //             'so.date',
-    //             'so.products',
-    //             'so.delivery_date',
-    //             'so.date_delivered',
-    //             'so.status',
-    //             'so.order_type',
-    //             'so.amount as total_sales',
-    //             'so.quantities',
-    //             'c.name as customer_name'
-    //         )
-    //         ->orderBy('so.date', 'desc')
-    //         ->get()
-    //         ->map(function ($order) use ($inventoryMap, $supplierOffersMap) {
-    
-    //             $quantities = json_decode($order->quantities, true) ?? [];
-    //             $cogs = 0;
-    //             $totalQty = 0;
-    
-    //             Log::info("=== Order {$order->id} ===");
-    
-    //             foreach ($quantities as $productName => $casesSold) {
-    //                 $casesSold = (int)$casesSold;
-    //                 $totalQty += $casesSold;
-    
-    //                 $inventory = $inventoryMap->get($productName);
-    
-    //                 if (!$inventory) {
-    //                     Log::warning("No inventory for: $productName");
-    //                     continue;
-    //                 }
-    
-    //                 Log::info("Product: $productName | Cases Sold: $casesSold");
-                    
-    //                 $selectedMaterials = json_decode($inventory->selected_materials, true) ?? [];
-    //                 $productionCostPerCase = 0;
-    //                 $pcsPerCase = (int)$inventory->pcs_per_unit ?: 1;
-    
-    //                 Log::info("Pieces per case: $pcsPerCase");
-    //                 Log::info("Selected Materials:", $selectedMaterials);
-    
-    //                 foreach ($selectedMaterials as $rawMatName => $supplierOfferId) {
-    //                     $supplierOffer = $supplierOffersMap->get($supplierOfferId);
-    
-    //                     if (!$supplierOffer) {
-    //                         Log::warning("Supplier offer #$supplierOfferId not found");
-    //                         continue;
-    //                     }
-    
-    //                     $pricePerUnit = (float)$supplierOffer->price;
-    //                     $conversion = (float)$supplierOffer->conversion ?: 1; // conversion = pieces per unit
-                        
-    //                     // Price per individual piece of raw material
-    //                     $pricePerPiece = $pricePerUnit / $conversion;
-                        
-    //                     // Cost for one case = price per piece × pieces per case
-    //                     $costPerCase = $pricePerPiece * $pcsPerCase;
-    
-    //                     Log::info("  Raw Material: {$supplierOffer->rawmat_name} (Offer #$supplierOfferId)");
-    //                     Log::info("    Price per unit: ₱$pricePerUnit");
-    //                     Log::info("    Conversion (pcs/unit): $conversion");
-    //                     Log::info("    Price per piece: ₱" . number_format($pricePerPiece, 4));
-    //                     Log::info("    Pieces per case: $pcsPerCase");
-    //                     Log::info("    Cost per case: ₱$pricePerPiece × $pcsPerCase = ₱" . number_format($costPerCase, 2));
-    
-    //                     $productionCostPerCase += $costPerCase;
-    //                 }
-    
-    //                 Log::info("Total Production Cost Per Case: ₱" . number_format($productionCostPerCase, 2));
-    //                 Log::info("COGS for this product: ₱$productionCostPerCase × $casesSold cases = ₱" . number_format($productionCostPerCase * $casesSold, 2));
-    
-    //                 $cogs += $productionCostPerCase * $casesSold;
-    //             }
-    
-    //             Log::info("==================");
-    //             Log::info("ORDER TOTALS:");
-    //             Log::info("Total Sales: ₱" . number_format($order->total_sales, 2));
-    //             Log::info("Total COGS: ₱" . number_format($cogs, 2));
-    //             Log::info("Profit: ₱" . number_format($order->total_sales - $cogs, 2));
-    //             Log::info("==================");
-    
-    //             $order->total_qty = $totalQty;
-    //             $order->cogs = round($cogs, 2);
-    //             $order->profit = round($order->total_sales - $cogs, 2);
-    
-    //             return $order;
-    //         });
-    
-    //     return response()->json($salesOrders);
-    // }
+   
 
 
     public function salesReport(Request $request)
@@ -1092,4 +978,66 @@ public function purchaseOrderReportPDF(Request $request)
     return $pdf->download($fileName);
 }
 
+
+
+public function receivedItemsReportPDF(Request $request)
+{
+    try {
+        $supplier = $request->query('supplier', 'All');
+        $month = $request->query('month'); // format: YYYY-MM
+        $dateNow = Carbon::now()->format('mdY');
+
+        // Base query: join purchase_receipts with purchase_orders
+        $query = DB::table('purchase_receipts as pr')
+            ->join('purchase_orders as po', 'po.id', '=', 'pr.purchase_order_id')
+            ->select(
+                'pr.item_name',
+                'po.po_number',
+                'po.supplier_name',
+                'pr.received_date',
+                'pr.quantity_received'
+            );
+
+        // Month filter
+        if ($month) {
+            $query->where('pr.received_date', 'like', "$month%");
+        }
+
+        // Supplier filter
+        if ($supplier !== 'All') {
+            $query->where('po.supplier_name', $supplier);
+        }
+
+        // Fetch data
+        $receivedItems = $query->orderBy('pr.received_date', 'desc')->get();
+
+        // Format quantity_received
+        $receivedItems = $receivedItems->map(function ($item) {
+            $item->quantity_received = number_format($item->quantity_received ?? 0);
+            return $item;
+        });
+
+        // File name
+        $cleanSupplier = $supplier !== 'All' ? str_replace(' ', '_', $supplier) : 'All';
+        $dateStr = $month ? str_replace('-', '', $month) : $dateNow;
+        $fileName = "Received_Items_Report_{$cleanSupplier}_{$dateStr}.pdf";
+
+        // Generate PDF
+        return Pdf::loadView('pdfs.received_items_report', [
+            'receivedItems' => $receivedItems,
+            'supplier' => $supplier,
+            'month' => $month,
+            'generatedAt' => Carbon::now()->format('F j, Y, g:i A'),
+        ])
+        ->setPaper('a4', 'landscape')
+        ->download($fileName);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ], 500);
+    }
+}
 }

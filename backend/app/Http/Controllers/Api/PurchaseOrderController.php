@@ -580,7 +580,6 @@ class PurchaseOrderController extends Controller
         }
     }
     
-    
     private function checkAndUpdateNotifications(array $finishedGoodsIds, array $rawMaterialIds)
     {
         foreach ($finishedGoodsIds as $id) {
@@ -621,19 +620,19 @@ class PurchaseOrderController extends Controller
         if ($priority) {
             $this->createOrUpdateNotification($item, $type, $priority, $quantity, $lowStockAlert);
         } else {
+            // Delete notification when resolved (stock back to normal)
             $this->removeNotification($item, $type);
         }
     }
     
     private function createOrUpdateNotification($item, string $type, string $priority, float $quantity, float $lowStockAlert)
     {
-        $notification = \App\Models\InventoryNotification::where('notifiable_type', $type)
+        // Check if upgrading from warning to critical
+        $existing = \App\Models\InventoryNotification::where('notifiable_type', $type)
             ->where('notifiable_id', $item->id)
             ->first();
     
         $data = [
-            'notifiable_type' => $type,
-            'notifiable_id' => $item->id,
             'item_name' => $item->item,
             'priority' => $priority,
             'current_quantity' => $quantity,
@@ -641,19 +640,24 @@ class PurchaseOrderController extends Controller
             'unit' => $item->unit ?? null,
         ];
     
-        if ($notification) {
-            if ($notification->priority === 'warning' && $priority === 'critical') {
-                $data['is_read'] = false;
-                $data['read_at'] = null;
-            }
-            
-            $notification->update($data);
-        } else {
-            \App\Models\InventoryNotification::create($data);
+        // Reset read status if escalating from warning to critical
+        if ($existing && $existing->priority === 'warning' && $priority === 'critical') {
+            $data['is_read'] = false;
+            $data['read_at'] = null;
         }
+    
+        \App\Models\InventoryNotification::updateOrCreate(
+            [
+                'notifiable_type' => $type,
+                'notifiable_id' => $item->id,
+            ],
+            $data
+        );
     }
+    
     private function removeNotification($item, string $type)
     {
+        // Delete notification when stock is resolved
         \App\Models\InventoryNotification::where('notifiable_type', $type)
             ->where('notifiable_id', $item->id)
             ->delete();
