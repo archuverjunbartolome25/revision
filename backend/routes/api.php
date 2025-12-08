@@ -255,6 +255,7 @@ Route::get('inventory-report-pdf', [ReportController::class, 'inventoryReportPDF
 Route::get('disposals/pdf', [ReportController::class, 'disposalReportPDF'])->name('disposals.pdf');
 Route::get('/return-to-vendor/pdf', [ReportController::class, 'returnToVendorReportPDF']);
 Route::get('purchase-order-report-pdf', [ReportController::class, 'purchaseOrderReportPDF']);
+Route::get('received-items-report-pdf', [ReportController::class, 'receivedItemsReportPDF']);
 
 
 // ============================

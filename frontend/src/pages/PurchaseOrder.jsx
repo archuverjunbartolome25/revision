@@ -274,7 +274,6 @@ function PurchaseOrder() {
 	const [itemPrices, setItemPrices] = useState({});
 
 	// ✅ Fetch suppliers & offers from backend
-	// ✅ Fetch suppliers & offers from backend
 	useEffect(() => {
 		const fetchSuppliersAndOffers = async () => {
 			try {

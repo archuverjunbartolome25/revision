@@ -11,6 +11,8 @@ import {
 	FaTrashAlt,
 	FaBell,
 } from "react-icons/fa";
+import { api, ensureCsrf } from "../axios";
+
 import NotificationDropdown from "../components/NotificationDropdown";
 import { TbReportSearch } from "react-icons/tb";
 import { MdOutlineDashboard, MdOutlineInventory2 } from "react-icons/md";
@@ -112,9 +114,18 @@ function PurchaseOrderReport() {
 
 	const storedRole = localStorage.getItem("role");
 	const canAccess = (module) => roles[module]?.includes(storedRole);
+	const [selectedReceipt, setSelectedReceipt] = useState(null);
 
 	const location = useLocation();
 	const navigate = useNavigate();
+
+	const formatDate = (dateString) => {
+		const date = new Date(dateString);
+		const mm = String(date.getMonth() + 1).padStart(2, "0");
+		const dd = String(date.getDate()).padStart(2, "0");
+		const yyyy = date.getFullYear();
+		return `${mm}/${dd}/${yyyy}`;
+	};
 
 	// Map route paths to dropdown values
 	const reportMap = {
@@ -153,6 +164,8 @@ function PurchaseOrderReport() {
 	const [role, setRole] = useState("");
 	const [showDropdown, setShowDropdown] = useState(false);
 
+	const [currentReceivePage, setCurrentReceivePage] = useState(1);
+	const [receivedItemsPerPage] = useState(8);
 	const [stockNotifications, setStockNotifications] = useState([]);
 	const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
@@ -197,6 +210,8 @@ function PurchaseOrderReport() {
 	const [activityLogs, setActivityLogs] = useState([]);
 	// Add filter states at the top
 	const [searchTerm, setSearchTerm] = useState("");
+	const [receivedItemsSearchTerm, setReceivedItemsSearchTerm] = useState("");
+
 	const [logSearch, setLogSearch] = useState("");
 	const [logType, setLogType] = useState("All"); // Finished Goods / Raw Materials / All
 	const [logDate, setLogDate] = useState(""); // yyyy-mm-dd format
@@ -225,6 +240,66 @@ function PurchaseOrderReport() {
 	const purchaseOrderSupplierOptions = Array.from(
 		new Set(purchaseOrders.map((data) => data.supplier_name).filter(Boolean))
 	);
+
+	const [receivedItems, setReceivedItems] = useState([]);
+
+	const receivedItemsSupplierOptions = Array.from(
+		new Set(receivedItems.map((item) => item.supplier_name))
+	);
+
+	const [receivedItemsSupplierFilter, setReceivedItemsSupplierFilter] =
+		useState("All");
+	const [filterReceiveDate, setFilterReceiveDate] = useState(""); // YYYY-MM-DD
+
+	const filteredReceivedItems = receivedItems.filter((item) => {
+		const search = receivedItemsSearchTerm.toLowerCase();
+
+		const matchesSearch =
+			item.item_name.toLowerCase().includes(search) ||
+			item.po_number.toLowerCase().includes(search) ||
+			item.supplier_name.toLowerCase().includes(search) ||
+			String(item.quantity_received).toLowerCase().includes(search) ||
+			item.received_date.toLowerCase().includes(search);
+
+		if (!matchesSearch) return false;
+
+		// --- FILTER BY MONTH ---
+		if (filterReceiveDate) {
+			// item.received_date is YYYY-MM-DD, so slice to YYYY-MM
+			const itemMonth = item.received_date.slice(0, 7); // YYYY-MM
+
+			if (itemMonth !== filterReceiveDate) return false;
+		}
+
+		// --- SUPPLIER FILTER ---
+		if (
+			receivedItemsSupplierFilter !== "All" &&
+			item.supplier_name !== receivedItemsSupplierFilter
+		)
+			return false;
+
+		return true;
+	});
+
+	const indexOfLastReceived = currentReceivePage * receivedItemsPerPage;
+	const indexOfFirstReceived = indexOfLastReceived - receivedItemsPerPage;
+	const currentReceivedItems = filteredReceivedItems.slice(
+		indexOfFirstReceived,
+		indexOfLastReceived
+	);
+
+	const fetchReceivedItems = async () => {
+		try {
+			const response = await api.get("/api/purchase-receipts"); // adjust endpoint name if different
+			setReceivedItems(response.data);
+		} catch (error) {
+			console.error("Failed to fetch received items:", error);
+		}
+	};
+
+	useEffect(() => {
+		fetchReceivedItems();
+	}, []);
 
 	const filteredPurchaseOrders = purchaseOrders.filter((po) => {
 		const term = searchTerm.toLowerCase();
@@ -811,6 +886,186 @@ function PurchaseOrderReport() {
 							} catch (error) {
 								console.error("Error generating Purchase Order PDF:", error);
 								alert("Failed to generate PDF. Check console for details.");
+							}
+						}}
+					>
+						Generate PDF
+					</button>
+				</div>
+
+				<hr />
+
+				<div className="d-flex gap-3 mt-5 align-items-center">
+					<h2 className="topbar-title">Received Items</h2>
+
+					<input
+						type="text"
+						className="form-control"
+						style={{ width: "250px" }}
+						placeholder="Search received items"
+						value={receivedItemsSearchTerm}
+						onChange={(e) => setReceivedItemsSearchTerm(e.target.value)}
+					/>
+
+					<select
+						className="form-select form-select-sm"
+						style={{ width: "200px" }}
+						value={receivedItemsSupplierFilter}
+						onChange={(e) => setReceivedItemsSupplierFilter(e.target.value)}
+					>
+						<option value="All">All Suppliers</option>
+						{receivedItemsSupplierOptions.map((supplier) => (
+							<option key={supplier} value={supplier}>
+								{supplier}
+							</option>
+						))}
+					</select>
+
+					<label className="fw-bold me-2">Filter by month:</label>
+
+					<input
+						type="month"
+						className="form-control rounded-end-0"
+						style={{ width: "200px" }}
+						value={filterReceiveDate}
+						max={new Date().toISOString().slice(0, 7)} // YYYY-MM
+						onChange={(e) => setFilterReceiveDate(e.target.value)}
+					/>
+				</div>
+
+				<div className="topbar-inventory-box mt-3">
+					<table className="custom-table">
+						<thead>
+							<tr>
+								<th>Purchase Order #</th>
+								<th>Supplier</th>
+								<th>Item Name</th>
+								<th>Qty Received(pcs)</th>
+								<th>Date Received</th>
+							</tr>
+						</thead>
+						<tbody>
+							{loading ? (
+								// 🦴 Skeleton loading placeholder (5 rows)
+								[...Array(5)].map((_, i) => (
+									<tr key={i} className="animate-pulse">
+										<td>
+											<Skeleton width={20} />
+										</td>
+										<td>
+											<Skeleton width={100} />
+										</td>
+										<td>
+											<Skeleton width={80} />
+										</td>
+										<td>
+											<Skeleton width={59} />
+										</td>
+										<td>
+											<Skeleton width={100} />
+										</td>
+									</tr>
+								))
+							) : filteredReceivedItems.length > 0 ? (
+								currentReceivedItems.map((item, index) => (
+									<tr
+										key={index}
+										onClick={() => {
+											setSelectedReceipt(item);
+											setIsReceiptModalOpen(true);
+										}}
+										style={{ cursor: "pointer" }}
+									>
+										<td>{item.po_number}</td>
+										<td>{item.supplier_name}</td>
+										<td>
+											{itemDisplayNames[item.item_name] || item.item_name}
+										</td>
+										<td>{formatNumber(item.quantity_received)} pcs</td>
+										<td>
+											{item.received_date
+												? formatDate(item.received_date)
+												: "—"}
+										</td>
+									</tr>
+								))
+							) : (
+								<tr>
+									<td colSpan="5" className="text-center text-muted">
+										No items received yet.
+									</td>
+								</tr>
+							)}
+						</tbody>
+					</table>
+					{/* Pagination for Received Items */}
+					<div className="d-flex justify-content-between mt-2">
+						<button
+							className="btn btn-sm btn-light"
+							disabled={currentReceivePage === 1}
+							onClick={() => setCurrentReceivePage(currentReceivePage - 1)}
+						>
+							&larr; Previous
+						</button>
+						<span className="text-muted small align-self-center">
+							Page {currentReceivePage} of{" "}
+							{Math.ceil(filteredReceivedItems.length / receivedItemsPerPage) ||
+								1}
+						</span>
+						<button
+							className="btn btn-sm btn-light"
+							disabled={indexOfLastReceived >= filteredReceivedItems.length}
+							onClick={() => setCurrentReceivePage(currentReceivePage + 1)}
+						>
+							Next &rarr;
+						</button>
+					</div>
+				</div>
+
+				{/*Generate Purchase Order PDF*/}
+				<div className="text-end mt-3">
+					<button
+						className="btn btn-sm btn-success"
+						onClick={async () => {
+							try {
+								// Build API URL
+								// const url = `http://localhost:8000/api/received-items-report-pdf?supplier=${encodeURIComponent(
+								// 	receivedItemsSupplierFilter || "All"
+								// )}${
+								// 	filterReceiveDate
+								// 		? `&month=${encodeURIComponent(filterReceiveDate)}`
+								// 		: ""
+								// }`;
+								const url = `http://localhost:8000/api/received-items-report-pdf?month=${encodeURIComponent(
+									filterReceiveDate ?? ""
+								)}`;
+								console.log("Call me");
+
+								const response = await fetch(url);
+								if (!response.ok) throw new Error("Failed to generate PDF");
+
+								const blob = await response.blob();
+								const pdfUrl = window.URL.createObjectURL(blob);
+
+								const a = document.createElement("a");
+								a.href = pdfUrl;
+
+								const dateStr = filterReceiveDate
+									? filterReceiveDate.replace(/-/g, "")
+									: new Date().toISOString().slice(0, 7).replace(/-/g, "");
+
+								const cleanSupplier =
+									receivedItemsSupplierFilter &&
+									receivedItemsSupplierFilter !== "All"
+										? receivedItemsSupplierFilter.replace(/\s+/g, "_")
+										: "All";
+
+								a.download = `Received_Items_Report_${cleanSupplier}_${dateStr}.pdf`;
+								document.body.appendChild(a);
+								a.click();
+								a.remove();
+							} catch (error) {
+								console.error("Error generating Received Items PDF:", error);
 							}
 						}}
 					>
