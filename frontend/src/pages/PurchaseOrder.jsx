@@ -668,11 +668,16 @@ function PurchaseOrder() {
 			item.po_number.toLowerCase().includes(search) ||
 			item.supplier_name.toLowerCase().includes(search) ||
 			String(item.quantity_received).toLowerCase().includes(search) ||
-			item.received_date.toLowerCase().includes(search); // now allowed
+			item.received_date.toLowerCase().includes(search);
 
 		if (!matchesSearch) return false;
 
-		if (filterReceiveDate && item.received_date !== filterReceiveDate)
+		// Fixed date filter: compare only YYYY-MM-DD
+		if (
+			filterReceiveDate &&
+			new Date(item.received_date).toISOString().slice(0, 10) !==
+				filterReceiveDate
+		)
 			return false;
 
 		if (

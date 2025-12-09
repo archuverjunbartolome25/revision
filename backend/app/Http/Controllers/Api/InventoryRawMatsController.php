@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\InventoryRawMat;
+use Illuminate\Support\Facades\DB;
 
 class InventoryRawMatsController extends Controller
 {
@@ -250,14 +251,31 @@ public function index()
         ]);
     }
 
-
     public function getAllWithSuppliers()
     {
         $rawMats = InventoryRawmat::with(['supplierOffers.supplier'])->get()
             ->flatMap(function ($item) {
+                // Get sum of all additions (where remaining > previous)
+                $totalReceived = DB::table('inventory_activity_logs')
+                    ->where('item_name', $item->item)
+                    ->whereColumn('remaining_quantity', '>', 'previous_quantity')
+                    ->selectRaw('SUM(remaining_quantity - previous_quantity) as total')
+                    ->value('total');
+                
+                $last_received = $totalReceived ?? 0;
+                
+                // Get sum of all deductions (where remaining < previous)
+                $totalDeducted = DB::table('inventory_activity_logs')
+                    ->where('item_name', $item->item)
+                    ->whereColumn('remaining_quantity', '<', 'previous_quantity')
+                    ->selectRaw('SUM(previous_quantity - remaining_quantity) as total')
+                    ->value('total');
+                
+                $last_deduct = $totalDeducted ?? 0;
+                
                 // If there are supplier offers, create one row per supplier
                 if ($item->supplierOffers->isNotEmpty()) {
-                    return $item->supplierOffers->map(function ($offer) use ($item) {
+                    return $item->supplierOffers->map(function ($offer) use ($item, $last_received, $last_deduct) {
                         return [
                             'id' => $item->id,
                             'item' => $item->item,
@@ -269,12 +287,14 @@ public function index()
                             'pcs_per_unit' => $item->quantity * ($item->conversion ?? 1),
                             'supplier_name' => optional($offer->supplier)->name ?? '—',
                             'unit_cost' => $offer->price,
+                            'last_received' => $last_received,
+                            'last_deduct' => $last_deduct,
                             'created_at' => $item->created_at,
                             'updated_at' => $item->updated_at,
                         ];
                     });
                 }
-
+    
                 // If no supplier offers, still return one row
                 return [[
                     'id' => $item->id,
@@ -287,14 +307,17 @@ public function index()
                     'pcs_per_unit' => $item->quantity * ($item->conversion ?? 1),
                     'supplier_name' => '—',
                     'unit_cost' => null,
+                    'last_received' => $last_received,
+                    'last_deduct' => $last_deduct,
                     'created_at' => $item->created_at,
                     'updated_at' => $item->updated_at,
                 ]];
             })
             ->values();
-
+    
         return response()->json($rawMats);
     }
+
     // public function getAllWithSuppliers()
     // {
     //     $rawMats = InventoryRawmat::with(['supplierOffers.supplier'])

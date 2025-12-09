@@ -12,15 +12,40 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
-    public function index()
+   public function index()
     {
         $inventories = Inventory::all()->map(function($item) {
             $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+            
+            // Find the latest activity log for this item by name
+            $latestLog = DB::table('inventory_activity_logs')
+                ->where('item_name', $item->item_name)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            // Add the quantities from the latest log
+            if ($latestLog) {
+                $item->previous_quantity = $latestLog->previous_quantity;
+                $item->remaining_quantity = $latestLog->remaining_quantity;
+            } else {
+                $item->previous_quantity = null;
+                $item->remaining_quantity = null;
+            }
+            
             return $item;
         });
 
         return response()->json($inventories);
     }
+    // public function index()
+    // {
+    //     $inventories = Inventory::all()->map(function($item) {
+    //         $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+    //         return $item;
+    //     });
+
+    //     return response()->json($inventories);
+    // }
 
 
     public function store(Request $request)
@@ -309,6 +334,51 @@ public function deduct(Request $request)
 
 
     // NOTE USED FOR BOM DISPLAY WITH MATERIAL DETAILS
+    // public function getAllFinishedGoodsWithNeededMaterials()
+    // {
+    //     $inventories = Inventory::all()->map(function($item) {
+    //         $item->materials_needed = $item->materials_needed ? json_decode($item->materials_needed) : [];
+    //         $selectedMaterials = $item->selected_materials ?? [];
+    //         $transformedMaterials = [];
+            
+    //         foreach ($selectedMaterials as $materialName => $supplierOfferId) {
+    //             // Get the supplier offer directly by ID
+    //             $supplierOffer = DB::table('supplier_offers')
+    //                 ->where('id', $supplierOfferId)
+    //                 ->first();
+                
+    //             if ($supplierOffer) {
+    //                 // Get raw material details
+    //                 $rawMaterial = DB::table('inventory_rawmats')
+    //                     ->where('id', $supplierOffer->rawmat_id)
+    //                     ->first();
+                    
+    //                 // Get supplier details
+    //                 $supplier = DB::table('suppliers')
+    //                     ->where('id', $supplierOffer->supplier_id)
+    //                     ->first();
+                    
+    //                 if ($rawMaterial && $supplier) {
+    //                     $transformedMaterials[] = [
+    //                         'raw_material_id' => $rawMaterial->id,
+    //                         'raw_material_name' => $rawMaterial->item,
+    //                         'raw_material_unit' => $supplierOffer->unit,
+    //                         'rawmats_pcs_per_unit' => $rawMaterial->conversion,
+    //                         'supplier_id' => $supplier->id,
+    //                         'supplier_name' => $supplier->name,
+    //                         'unit_price' => $supplierOffer->price,
+    //                     ];
+    //                 }
+    //             }
+    //         }
+            
+    //         $item->selected_materials = $transformedMaterials;
+    //         return $item;
+    //     });
+    
+    //     return response()->json($inventories);
+    // }
+
     public function getAllFinishedGoodsWithNeededMaterials()
     {
         $inventories = Inventory::all()->map(function($item) {
@@ -348,12 +418,45 @@ public function deduct(Request $request)
             }
             
             $item->selected_materials = $transformedMaterials;
+            
+            // Find the latest activity log for this item by name
+            $latestLog = DB::table('inventory_activity_logs')
+                ->where('item_name', $item->item)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            // Add the quantities from the latest log
+            if ($latestLog) {
+                $item->previous_quantity = $latestLog->previous_quantity;
+                $item->remaining_quantity = $latestLog->remaining_quantity;
+            } else {
+                $item->previous_quantity = null;
+                $item->remaining_quantity = null;
+            }
+            
+            // Get sum of all additions (where remaining > previous)
+            $totalReceived = DB::table('inventory_activity_logs')
+                ->where('item_name', $item->item)
+                ->whereColumn('remaining_quantity', '>', 'previous_quantity')
+                ->selectRaw('SUM(remaining_quantity - previous_quantity) as total')
+                ->value('total');
+            
+            $item->last_received = $totalReceived ?? 0;
+            
+            // Get sum of all deductions (where remaining < previous)
+            $totalDeducted = DB::table('inventory_activity_logs')
+                ->where('item_name', $item->item)
+                ->whereColumn('remaining_quantity', '<', 'previous_quantity')
+                ->selectRaw('SUM(previous_quantity - remaining_quantity) as total')
+                ->value('total');
+            
+            $item->last_deduct = $totalDeducted ?? 0;
+            
             return $item;
         });
     
         return response()->json($inventories);
     }
-
 
     public function updateMaterials(Request $request, $id)
     {

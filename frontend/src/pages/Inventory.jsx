@@ -221,6 +221,8 @@ function Inventory() {
 	const fetchInventory = async () => {
 		try {
 			setLoading(true);
+
+			console.log(inventoryType);
 			const endpoint =
 				inventoryType === "raw"
 					? "http://localhost:8000/api/inventory_rawmats/with-suppliers"
@@ -230,6 +232,8 @@ function Inventory() {
 			// : "http://localhost:8000/api/inventories";
 
 			const res = await axios.get(endpoint);
+
+			console.log(res);
 
 			const data = res.data.map((item) => ({
 				...item,
@@ -843,6 +847,8 @@ function Inventory() {
 										<th>Item</th>
 										<th>Unit</th>
 										<th>Qty (Unit)</th>
+										<th>Received Qty</th>
+										<th>Transaction Qty</th>
 										<th>Qty (Pieces)</th>
 										<th>Price</th>
 									</>
@@ -853,6 +859,8 @@ function Inventory() {
 										<th>Unit</th>
 										<th>Count per unit</th>
 										<th>Qty (Unit)</th>
+										<th>Received Qty</th>
+										<th>Transaction Qty</th>
 										<th>Qty (Pieces)</th>
 										<th>Market Price (-)</th>
 									</>
@@ -938,6 +946,20 @@ function Inventory() {
 														{formatNumber(item.quantity)} {item.unit}
 													</td>
 
+													<td
+														className={"text-success"}
+														style={{ fontWeight: "bold" }}
+													>
+														+ {formatNumber(item.last_received)} pcs
+													</td>
+
+													<td
+														className={"text-danger"}
+														style={{ fontWeight: "bold" }}
+													>
+														- {formatNumber(item.last_deduct)} pcs
+													</td>
+
 													{/* Quantity (Pieces) */}
 													<td
 														className="text-muted"
@@ -963,6 +985,20 @@ function Inventory() {
 
 													<td>
 														{formatNumber(item.quantity)} {item.unit}
+													</td>
+
+													<td
+														className={"text-success"}
+														style={{ fontWeight: "bold" }}
+													>
+														+ {formatNumber(item.last_received)} pcs
+													</td>
+
+													<td
+														className={"text-danger"}
+														style={{ fontWeight: "bold" }}
+													>
+														- {formatNumber(item.last_deduct)} pcs
 													</td>
 
 													<td
