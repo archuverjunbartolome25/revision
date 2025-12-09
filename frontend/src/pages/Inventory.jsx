@@ -847,9 +847,11 @@ function Inventory() {
 										<th>Item</th>
 										<th>Unit</th>
 										<th>Qty (Unit)</th>
+										<th>Beginning Qty (Pieces)</th>
 										<th>Received Qty</th>
 										<th>Transaction Qty</th>
-										<th>Qty (Pieces)</th>
+										<th>New Qty (Pieces)</th>
+										{/* <th>New Qty (Pieces)</th> */}
 										<th>Price</th>
 									</>
 								) : (
@@ -890,6 +892,18 @@ function Inventory() {
 												</td>
 												<td>
 													<Skeleton width={90} />
+												</td>
+																								<td>
+													<Skeleton width={80} />
+												</td>
+																								<td>
+													<Skeleton width={80} />
+												</td>
+																								<td>
+													<Skeleton width={80} />
+												</td>
+																																				<td>
+													<Skeleton width={80} />
 												</td>
 											</>
 										) : (
@@ -945,7 +959,9 @@ function Inventory() {
 													>
 														{formatNumber(item.quantity)} {item.unit}
 													</td>
-
+													<td	className="text-muted text-center"
+														style={{ fontWeight: "bold"}}>
+															{formatNumber(item.quantity_pcs - item.last_received + item.last_deduct)}</td>
 													<td
 														className={"text-success"}
 														style={{ fontWeight: "bold" }}
@@ -959,8 +975,7 @@ function Inventory() {
 													>
 														- {formatNumber(item.last_deduct)} pcs
 													</td>
-
-													{/* Quantity (Pieces) */}
+																									
 													<td
 														className="text-muted"
 														style={{ fontWeight: "bold" }}
