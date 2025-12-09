@@ -206,6 +206,7 @@ function PurchaseOrderReport() {
 
 	const [poStatusFilter, setPoStatusFilter] = useState("All"); // default shows all
 	const [poDateFilter, setPoDateFilter] = useState("");
+
 	const [supplierFilter, setSupplierFilter] = useState("All");
 	const [activityLogs, setActivityLogs] = useState([]);
 	// Add filter states at the top
@@ -709,7 +710,7 @@ function PurchaseOrderReport() {
 					</select>
 
 					{/* Date Filter */}
-					<input
+					{/* <input
 						type="date"
 						className="form-control"
 						style={{ width: "150px" }}
@@ -719,6 +720,15 @@ function PurchaseOrderReport() {
 							setPoDateFilter(e.target.value);
 							setPoCurrentPage(1);
 						}}
+						
+					/> */}
+					<input
+						type="month"
+						className="form-control rounded-end-0"
+						style={{ width: "200px" }}
+						value={poDateFilter}
+						max={new Date().toISOString().slice(0, 7)} // YYYY-MM
+						onChange={(e) => setPoDateFilter(e.target.value)}
 					/>
 					<button
 						className="btn btn-sm btn-secondary"
@@ -855,11 +865,7 @@ function PurchaseOrderReport() {
 							try {
 								const url = `http://localhost:8000/api/purchase-order-report-pdf?status=${encodeURIComponent(
 									poStatusFilter || "All"
-								)}${
-									poDateFilter
-										? `&date=${encodeURIComponent(poDateFilter)}`
-										: ""
-								}`;
+								)}&month=${encodeURIComponent(poDateFilter ?? "")}`;
 
 								const response = await fetch(url);
 								if (!response.ok) throw new Error("Failed to generate PDF");
@@ -872,7 +878,7 @@ function PurchaseOrderReport() {
 
 								const dateStr = poDateFilter
 									? poDateFilter.replace(/-/g, "")
-									: new Date().toISOString().slice(0, 10).replace(/-/g, "");
+									: new Date().toISOString().slice(0, 7).replace(/-/g, "");
 
 								const cleanStatus =
 									poStatusFilter && poStatusFilter !== "All"
@@ -1028,18 +1034,9 @@ function PurchaseOrderReport() {
 						className="btn btn-sm btn-success"
 						onClick={async () => {
 							try {
-								// Build API URL
-								// const url = `http://localhost:8000/api/received-items-report-pdf?supplier=${encodeURIComponent(
-								// 	receivedItemsSupplierFilter || "All"
-								// )}${
-								// 	filterReceiveDate
-								// 		? `&month=${encodeURIComponent(filterReceiveDate)}`
-								// 		: ""
-								// }`;
 								const url = `http://localhost:8000/api/received-items-report-pdf?month=${encodeURIComponent(
 									filterReceiveDate ?? ""
 								)}`;
-								console.log("Call me");
 
 								const response = await fetch(url);
 								if (!response.ok) throw new Error("Failed to generate PDF");

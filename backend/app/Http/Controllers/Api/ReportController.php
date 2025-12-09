@@ -916,69 +916,77 @@ public function returnToVendorReportPDF(Request $request)
 
     return $pdf->download($fileName);
 }
+
 public function purchaseOrderReportPDF(Request $request)
 {
-    $status = $request->query('status', 'All'); // Filter by status if provided
-    $date = $request->query('date'); // Filter by date if provided
-    $dateNow = Carbon::now()->format('mdY');
+    try {
+        $status = $request->query('status', 'All');
+        $month = $request->query('month');
+        $dateNow = Carbon::now()->format('mdY');
 
-    // Fetch purchase orders
-    $query = DB::table('purchase_orders')
-        ->select(
-            'id',
-            'po_number',
-            'order_date',
-            'expected_date',
-            'status',
-            'amount',
-            'supplier_name'
-        );
+        // Fetch purchase orders
+        $query = DB::table('purchase_orders')
+            ->select(
+                'id',
+                'po_number',
+                'order_date',
+                'expected_date',
+                'status',
+                'amount',
+                'supplier_name'
+            );
 
-    // Apply status filter
-    if ($status !== 'All') {
-        $query->where('status', $status);
+        // Apply status filter
+        if ($status !== 'All') {
+            $query->where('status', $status);
+        }
+
+        // Apply month filter
+        if ($month) {
+            $query->where('order_date', 'like', "$month%");
+        }
+
+        $purchaseOrders = $query->orderBy('order_date', 'desc')->get();
+
+        // Fetch items for each PO
+        $purchaseOrders = $purchaseOrders->map(function ($po) {
+            $items = DB::table('purchase_order_items')
+                ->where('purchase_order_id', $po->id)
+                ->select('item_name', 'quantity', 'received_quantity')
+                ->get()
+                ->map(function ($item) {
+                    $item->quantity = number_format($item->quantity);
+                    $item->received_quantity = number_format($item->received_quantity);
+                    return $item;
+                });
+        
+            $po->items = $items;
+            return $po;
+        });
+
+        $cleanStatus = $status !== 'All' ? str_replace(' ', '_', $status) : 'All';
+        $dateStr = $month ? str_replace('-', '', $month) : $dateNow;
+        $fileName = "Purchase_Order_Report_{$cleanStatus}_{$dateStr}.pdf";
+
+        \Log::info('Generating PDF', ['filename' => $fileName]);
+
+        $pdf = Pdf::loadView('pdfs.purchase_order_report', [
+            'purchaseOrders' => $purchaseOrders,
+            'status' => $status,
+            'month' => $month,
+            'generatedAt' => Carbon::now()->format('F j, Y, g:i A'),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download($fileName);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile()
+        ], 500);
     }
-
-    // Apply date filter
-    if ($date) {
-        $query->whereDate('order_date', $date);
-    }
-
-    $purchaseOrders = $query->orderBy('order_date', 'desc')->get();
-
-    // Fetch items for each PO
-    $purchaseOrders = $purchaseOrders->map(function ($po) {
-        $items = DB::table('purchase_order_items')
-            ->where('purchase_order_id', $po->id)
-            ->select('item_name', 'quantity', 'received_quantity')
-            ->get()
-            ->map(function ($item) {
-                $item->quantity = number_format($item->quantity);
-                $item->received_quantity = number_format($item->received_quantity);
-                return $item;
-            });
-    
-        $po->items = $items;
-        return $po;
-    });
-
-    // Generate filename
-    $fileName = "Purchase_Order_Report_" 
-        . ($status !== 'All' ? str_replace(' ', '_', $status) : 'All') 
-        . "_{$dateNow}.pdf";
-
-    // Generate PDF using Blade view
-    $pdf = Pdf::loadView('pdfs.purchase_order_report', [
-        'purchaseOrders' => $purchaseOrders,
-        'status' => $status,
-        'selectedDate' => $date,
-        'generatedAt' => Carbon::now()->format('F j, Y, g:i A'),
-    ])->setPaper('a4', 'landscape');
-
-    return $pdf->download($fileName);
 }
-
-
 
 public function receivedItemsReportPDF(Request $request)
 {

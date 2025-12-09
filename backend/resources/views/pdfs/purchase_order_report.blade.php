@@ -17,7 +17,10 @@
     <h2>
         Purchase Order Report
         @if(!empty($status) && strtolower($status) !== 'all')
-            <small>({{ $status }})</small>
+            <small>(Status: {{ $status }})</small>
+        @endif
+        @if(!empty($month))
+            <small>(Month: {{ \Carbon\Carbon::parse($month . '-01')->format('F Y') }})</small>
         @endif
     </h2>
     <small>Generated on: {{ $generatedAt }}</small>
